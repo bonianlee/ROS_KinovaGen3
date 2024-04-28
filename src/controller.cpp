@@ -57,6 +57,72 @@ namespace chang
     }
 }
 
+namespace lee
+{
+    void get_phi(const Matrix<double> &q, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi)
+    {
+        Matrix<double> X(14 + 2 * DOF, 1);
+        for (unsigned i = 0; i < (14 + 2 * DOF); i++)
+        {
+            if (i < 7) 
+                X[i] = q[i];
+            else if (6 < i && i < 14)
+                X[i] = dq[i];
+            else if (13 < i && i < 14 + DOF)
+                X[i] = dxd[i];
+            else
+                X[i] = ddxd[i];
+        }
+        for (unsigned i = 0; i < NODE; i++)
+        {
+            Matrix<double> cj(14 + 2 * DOF, 1);
+            // q1 ~ q7
+            cj[0] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+            cj[1] = (q2_MIN) + ((q2_MAX-q2_MIN) / (NODE - 1)) * i;
+            cj[2] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+            cj[3] = (q4_MIN) + ((q4_MAX-q4_MIN) / (NODE - 1)) * i;
+            cj[4] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+            cj[5] = (q6_MIN) + ((q6_MAX-q6_MIN) / (NODE - 1)) * i;
+            cj[6] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+
+            // dq1 ~ dq7
+            for (unsigned j = 7; j < 11; j++) // joint 1-4
+                cj[j] = (-1.39) + (2.78 / (NODE - 1)) * i;
+            for (unsigned j = 11; j < 14; j++) // joint 5-7
+                cj[j] = (-1.22) + (2.44 / (NODE - 1)) * i;
+            
+            // dxd
+            for (unsigned j = 14; j < (14 + DOF); j++)
+                cj[j] = Cj_dxd_LOW + ((Cj_dxd_UP - Cj_dxd_LOW) / (NODE - 1)) * j;
+            
+            // ddxd
+            for (unsigned j = 14 + DOF; j < (14 + 2 * DOF); j++)
+                cj[j] = Cj_ddxd_LOW + ((Cj_ddxd_UP - Cj_ddxd_LOW) / (NODE - 1)) * j;
+
+            double norm = (X - cj).vec_norm2();
+            phi[i] = exp(-(norm * norm) / (Bj * Bj));
+        }
+    }
+
+    void get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, std::vector<Matrix<double>> &dW_hat)
+    {
+        for (int i = 0; i < DOF; i++)
+        {
+            dW_hat.at(i) = -Gamma_lee * derror[i] * phi;
+        }
+    }
+
+    void controller(const Matrix<double> &G, const Matrix<double> &J, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau)
+    {
+        Matrix<double> Dd(DOF, DOF, MatrixType::Diagonal, Dd_INITLIST);
+        Matrix<double> Kd(DOF, DOF, MatrixType::Diagonal, Kd_INITLIST);
+        Matrix<double> G0 = 0.9 * G;
+        // tau = J.transpose() * (Mx * ddxd + Cx * dxd + Gx - Dd * derror - Kd * error - PINV(derror.transpose()) * K1 * (error.transpose() * error));
+        tau = G0 + J.transpose() * (sigma - Dd * derror - Kd * error - vPINV(derror.transpose()) * K1 * (error.transpose() * error)) + subtasks;
+    }
+}
+
+
 void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi)
 {
     double psi_arr[7];
@@ -92,6 +158,14 @@ void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double>
 {
     Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
     subtasks = (eye - Jinv * J) * psi;
+    psi.zeros();
+}
+
+void null_space_subtasks_for_impedance(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
+{
+    Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
+    Matrix<double> Ks(7, 7, MatrixType::Diagonal, Ks_INITLIST);
+    subtasks = (eye - Jinv * J) * (psi - Ks * dq);
     psi.zeros();
 }
 
