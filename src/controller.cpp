@@ -67,11 +67,11 @@ namespace lee
             if (i < 7) 
                 X[i] = q[i];
             else if (6 < i && i < 14)
-                X[i] = dq[i];
+                X[i] = dq[i - 7];
             else if (13 < i && i < 14 + DOF)
-                X[i] = dxd[i];
+                X[i] = dxd[i - 14];
             else
-                X[i] = ddxd[i];
+                X[i] = ddxd[i - (14 + DOF)];
         }
         for (unsigned i = 0; i < NODE; i++)
         {
@@ -93,11 +93,11 @@ namespace lee
             
             // dxd
             for (unsigned j = 14; j < (14 + DOF); j++)
-                cj[j] = Cj_dxd_LOW + ((Cj_dxd_UP - Cj_dxd_LOW) / (NODE - 1)) * j;
+                cj[j] = Cj_dxd_LOW + ((Cj_dxd_UP - Cj_dxd_LOW) / (NODE - 1)) * i;
             
             // ddxd
             for (unsigned j = 14 + DOF; j < (14 + 2 * DOF); j++)
-                cj[j] = Cj_ddxd_LOW + ((Cj_ddxd_UP - Cj_ddxd_LOW) / (NODE - 1)) * j;
+                cj[j] = Cj_ddxd_LOW + ((Cj_ddxd_UP - Cj_ddxd_LOW) / (NODE - 1)) * i;
 
             double norm = (X - cj).vec_norm2();
             phi[i] = exp(-(norm * norm) / (Bj * Bj));
