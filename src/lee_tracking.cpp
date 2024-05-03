@@ -248,7 +248,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     dt = (double)(now - last) / 1000000;
                     dX = J * dq;
                     dJinv = (Jinv - prev_Jinv) / dt;
-                    for (unsigned i = 0; i < 7; i++)
+                    for (unsigned i = 0; i < DOF; i++)
                         W_hat.at(i) += dW_hat.at(i) * dt; // OK
                     prev_q = q;
                     prev_Jinv = Jinv;

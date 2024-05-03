@@ -8,7 +8,7 @@
 #include "ExceptionTypes.h"
 
 #define PINV(mat) mat.transpose() * (mat * mat.transpose()).inverse()
-#define vPINV(vec) PINV(vec.transpose() * vec) * vec.transpose()
+#define vPINV(vec) PINV((vec.transpose() * vec)) * vec.transpose()
 
 enum MatrixType
 {
