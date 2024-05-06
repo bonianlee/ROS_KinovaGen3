@@ -120,8 +120,54 @@ namespace lee
         // tau = J.transpose() * (Mx * ddxd + Cx * dxd + Gx - Dd * derror - Kd * error - PINV(derror.transpose()) * K1 * (error.transpose() * error));
         tau = G0 + J.transpose() * (sigma - Dd * derror - Kd * error - vPINV(derror.transpose()) * K1 * (error.transpose() * error)) + subtasks;
     }
-}
+    
+    void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        double psi_arr[7];
+        Matrix<double> psi_tmp(7, 1);
+    #ifdef JML_JOINT_ALL
+        const double q_max[7] = {q1_MAX, q2_MAX, q3_MAX, q4_MAX, q5_MAX, q6_MAX, q7_MAX};
+        const double q_min[7] = {q1_MIN, q2_MIN, q3_MIN, q4_MIN, q5_MIN, q6_MIN, q7_MIN};
+        kinova_psi_jointAngleLimits_all(q[0], q[1], q[2], q[3], q[4], q[5], q[6], q_max[0], q_max[1], q_max[2], q_max[3], q_max[4], q_max[5], q_max[6], q_min[0], q_min[1], q_min[2], q_min[3], q_min[4], q_min[5], q_min[6], psi_arr);
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0, k = 0; i < 7; i++, k++)
+    #elif defined(JML_JOINT_246)
+        const double q_max[3] = {q2_MAX, q4_MAX, q6_MAX};
+        const double q_min[3] = {q2_MIN, q4_MIN, q6_MIN};
+        kinova_psi_jointAngleLimits_246(q[1], q[3], q[5], q_max[0], q_max[1], q_max[2], q_min[0], q_min[1], q_min[2], psi_arr);
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0, k = 1; i < 3; i++, k += 2)
+    #endif
+            if ((q_max[i] > 0 && q_min[i] < 0) || (q_max[i] < 0 && q_min[i] > 0))
+                psi_tmp[k] = -psi_tmp[k];
+        psi += Ks_JOINT_LIMIT * psi_tmp;
+    }
 
+    void manipulability_psi(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        double psi_arr[7];
+        Matrix<double> psi_tmp(7, 1);
+        kinova_psi_manipulability(q[0], q[1], q[2], q[3], q[4], q[5], psi_arr);
+        psi_tmp.update_from_matlab(psi_arr);
+        psi += Ks_MANIPULABILITY * psi_tmp;
+    }
+
+    void manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        Matrix<double> qH(7, 1, MatrixType::General, qH_INITLIST);
+        Matrix<double> psi_tmp(7, 1);
+        psi_tmp = qH - q;
+        psi += Ks_MANIPULATOR_CONFIG * psi_tmp;
+    }
+
+    void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
+    {
+        Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
+        Matrix<double> Ksd(7, 7, MatrixType::Diagonal, Ksd_INITLIST);
+        subtasks = (eye - Jinv * J) * (psi - Ksd * dq);
+        psi.zeros();
+    }
+}
 
 void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi)
 {
@@ -158,14 +204,6 @@ void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double>
 {
     Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
     subtasks = (eye - Jinv * J) * psi;
-    psi.zeros();
-}
-
-void null_space_subtasks_for_impedance(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
-{
-    Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
-    Matrix<double> Ks(7, 7, MatrixType::Diagonal, Ks_INITLIST);
-    subtasks = (eye - Jinv * J) * (psi - Ks * dq);
     psi.zeros();
 }
 
