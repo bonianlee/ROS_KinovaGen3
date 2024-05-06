@@ -45,9 +45,16 @@
 #define Gamma_lee 10
 
 // lee's Subtasks Parameters
-#define Ks_INITLIST \
+#define Ks_MANIPULABILITY 1
+#define Ks_JOINT_LIMIT 1
+#define Ks_MANIPULATOR_CONFIG 0
+#define Ksd_INITLIST \
     {               \
         0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05    \
+    }
+#define qH_INITLIST \
+    {               \
+        0, 0.2618, 3.1416, -2.2689, 0, 0.9599, 1.5708   \
     }
 
 // chang's Controller Parameters
@@ -77,9 +84,6 @@
 #define Cj_a_UP 80
 #define Cj_a_LOW (-80)
 #define Bj 20
-
-#define Ks_MANIPULABILITY 1
-#define Ks_JOINT_LIMIT 1
 
 // all: JML_JOINT_ALL, Only even joints (2,4,6): JML_JOINT_246
 #define JML_JOINT_246
@@ -129,12 +133,15 @@ namespace lee
     void get_phi(const Matrix<double> &q, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi);
     void get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, std::vector<Matrix<double>> &dW_hat);
     void controller(const Matrix<double> &G, const Matrix<double> &J, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau);
+    void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi);
+    void manipulability_psi(const Matrix<double> &q, Matrix<double> &psi);
+    void manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi);
+    void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks);
 }
 void contrller_params(const Matrix<double> &J, const Matrix<double> &Jinv, const Matrix<double> &dJinv, const Matrix<double> &e, const Matrix<double> &de, const Matrix<double> &dq, const Matrix<double> &subtasks, const Matrix<double> &dsubtasks, Matrix<double> &s, Matrix<double> &v, Matrix<double> &a, Matrix<double> &r);
 void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi);
 void manipulability_psi(const Matrix<double> &q, Matrix<double> &psi);
 void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, Matrix<double> &subtasks);
-void null_space_subtasks_for_impedance(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks);
 void humanPos2platformVel(Matrix<double> &Xd, geometry_msgs::Twist &twist);
 void emergency_stop(ros::Publisher &platform_pub);
 #endif
