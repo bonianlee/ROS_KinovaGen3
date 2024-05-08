@@ -134,6 +134,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         }
         Matrix<double> phi(NODE, 1);
         Matrix<double> sigma(DOF, 1), controller_tau(7, 1);
+        double dGamma_lee, Gamma_lee;
         /* ------------ 初始值參數設定結束 ------------ */
 
         int64_t t_start = GetTickUs(), now = GetTickUs(), last = now; // 微秒
@@ -165,7 +166,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     
                     // RBFNN
                     lee::get_phi(q, dq, dXd, ddXd, phi);
-                    lee::get_dW_hat(phi, derror, dW_hat);
+                    lee::get_dW_hat(phi, derror, Gamma_lee, dGamma_lee, W_hat, dW_hat);
                     for (unsigned i = 0; i < DOF; i ++)
                         sigma[i] = (W_hat.at(i).transpose() * phi)[0]; 
 
@@ -219,6 +220,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                         W_hat.at(i) += dW_hat.at(i) * dt;
                         dq[i] = base_feedback.actuators(i).velocity() * DEG2RAD;
                     }
+                    Gamma_lee += dGamma_lee * dt;
                     dX = J * dq;
                     prev_q = q;
                     prev_Jinv = Jinv;
