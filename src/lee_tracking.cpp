@@ -116,6 +116,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         kinova_G_gripper(GRAVITY, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], G_arr);
         G.update_from_matlab(G_arr);
         
+        // 控制器相關
         Matrix<double> psi(7, 1), subtasks(7, 1);
         int64_t t_start = GetTickUs(), now = GetTickUs(), last = now; // 微秒
         double exp_time = (double)(now - t_start) / 1000000, dt;      // 秒
@@ -127,7 +128,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         Matrix<double> controller_tau(7, 1);
 
         // 目標輸出
-        Matrix<double> X0(DOF, 1, MatrixType::General, {0.58, 0, 0.43});
+        Matrix<double> X0(DOF, 1, MatrixType::General, {0.58, 0, 0.43, 1.21, 1.21, 1.21});
         Matrix<double> circle0(DOF, 1);
         circle0[0] = -0.2 * sin(0);
         circle0[1] = -0.3 * cos(0);
@@ -159,6 +160,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
             dW_hat.emplace_back(Matrix<double>(NODE, 1));
             W_hat.emplace_back(Matrix<double>(NODE, 1));
         }
+        double dGamma_lee, Gamma_lee;
         Matrix<double> phi(NODE, 1);
         Matrix<double> sigma(DOF, 1);
         //
@@ -179,16 +181,17 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                         base_command.mutable_actuators(i)->set_position(base_feedback.actuators(i).position());
                     
                     // subtasks
-                    joint_angle_limit_psi(position_curr, psi);
-                    manipulability_psi(position_curr, psi);
-                    null_space_subtasks_for_impedance(J, Jinv, psi, dq, subtasks);
+                    lee::joint_angle_limit_psi(position_curr, psi);
+                    lee::manipulability_psi(position_curr, psi);
+                    lee::manipulator_config_psi(position_curr, psi);
+                    lee::null_space_subtasks(J, Jinv, psi, dq, subtasks);
 
                     // RBFNN OK
                     lee::get_phi(q, dq, dXd, ddXd, phi);
-                    lee::get_dW_hat(phi, derror, dW_hat);
+                    lee::get_dW_hat(phi, derror, Gamma_lee, dGamma_lee, W_hat, dW_hat);
                     for (unsigned i = 0; i < DOF; i ++)
                         sigma[i] = (W_hat.at(i).transpose() * phi)[0]; 
-                    // kinovaInfo.torque[i] = sigma[i];
+                    
 
 
                     // 控制器 OK
@@ -250,6 +253,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     dJinv = (Jinv - prev_Jinv) / dt;
                     for (unsigned i = 0; i < DOF; i++)
                         W_hat.at(i) += dW_hat.at(i) * dt; // OK
+                    Gamma_lee += dGamma_lee * dt;
                     prev_q = q;
                     prev_Jinv = Jinv;
                     last = now;

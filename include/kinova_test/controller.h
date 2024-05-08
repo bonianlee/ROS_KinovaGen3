@@ -41,8 +41,13 @@
 #define Cj_dxd_LOW (-3)
 #define Cj_ddxd_UP 5
 #define Cj_ddxd_LOW (-5)
+#define Cj_Fext_UP (10)
+#define Cj_Fext_LOW (-10)
 #define Bj 20
-#define Gamma_lee 10
+#define Lambda1_lee 10
+#define Lambda2_lee 10
+#define Alpha1 1
+#define Alpha2 1
 
 // lee's Subtasks Parameters
 #define Ks_MANIPULABILITY 1
@@ -131,7 +136,7 @@ namespace chang
 namespace lee
 {
     void get_phi(const Matrix<double> &q, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi);
-    void get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, std::vector<Matrix<double>> &dW_hat);
+    void get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat);
     void controller(const Matrix<double> &G, const Matrix<double> &J, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau);
     void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi);
     void manipulability_psi(const Matrix<double> &q, Matrix<double> &psi);

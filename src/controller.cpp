@@ -61,21 +61,23 @@ namespace lee
 {
     void get_phi(const Matrix<double> &q, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi)
     {
-        Matrix<double> X(14 + 2 * DOF, 1);
+        Matrix<double> X(14 + (2 * DOF) + 1, 1);
         for (unsigned i = 0; i < (14 + 2 * DOF); i++)
         {
             if (i < 7) 
                 X[i] = q[i];
             else if (6 < i && i < 14)
                 X[i] = dq[i - 7];
-            else if (13 < i && i < 14 + DOF)
+            else if (13 < i && i < (14 + DOF))
                 X[i] = dxd[i - 14];
-            else
+            else if ((13 + DOF) < i && i < (14 + 2 * DOF))
                 X[i] = ddxd[i - (14 + DOF)];
+            else
+                X[i] = 1;
         }
         for (unsigned i = 0; i < NODE; i++)
         {
-            Matrix<double> cj(14 + 2 * DOF, 1);
+            Matrix<double> cj(14 + (2 * DOF) + 1, 1);
             // q1 ~ q7
             cj[0] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
             cj[1] = (q2_MIN) + ((q2_MAX-q2_MIN) / (NODE - 1)) * i;
@@ -99,17 +101,22 @@ namespace lee
             for (unsigned j = 14 + DOF; j < (14 + 2 * DOF); j++)
                 cj[j] = Cj_ddxd_LOW + ((Cj_ddxd_UP - Cj_ddxd_LOW) / (NODE - 1)) * i;
 
+            // for adaptive F_ext
+            for (unsigned j = 14 + 2 * DOF; j < (14 + 2 * DOF + 1); j++)
+                cj[j] = Cj_Fext_LOW + ((Cj_Fext_UP - Cj_Fext_LOW) / (NODE - 1)) * i;
+
             double norm = (X - cj).vec_norm2();
             phi[i] = exp(-(norm * norm) / (Bj * Bj));
         }
     }
 
-    void get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, std::vector<Matrix<double>> &dW_hat)
+    void get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat)
     {
+        dGamma_lee = -Alpha1 * Gamma_lee + Alpha2 * (phi.transpose() * phi)[0];
         for (int i = 0; i < DOF; i++)
-        {
-            dW_hat.at(i) = -Gamma_lee * derror[i] * phi;
-        }
+            dW_hat.at(i) = -Lambda1_lee * derror[i] * phi;
+        for (int i = 0; i < DOF; i++)
+            dW_hat.at(i) -= Lambda2_lee * abs(dGamma_lee) * W_hat.at(i);
     }
 
     void controller(const Matrix<double> &G, const Matrix<double> &J, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau)
