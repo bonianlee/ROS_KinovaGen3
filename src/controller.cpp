@@ -159,6 +159,76 @@ namespace lee
         psi += Ks_MANIPULABILITY * psi_tmp;
     }
 
+    void joint_limit_subtask(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        double psi_arr[7] = {0, 0, 0, 0, 0, 0, 0};
+        Matrix<double> psi_tmp(7, 1);
+        const double tol[7] = {10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180};
+        double qmin_tol[7], qmax_tol[7];
+        // Matrix<double> tol(7, 1, MatrixType::General, {10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180});
+    #ifdef JML_JOINT_ALL
+        const double q_max[7] = {q1_MAX, q2_MAX, q3_MAX, q4_MAX, q5_MAX, q6_MAX, q7_MAX};
+        const double q_min[7] = {q1_MIN, q2_MIN, q3_MIN, q4_MIN, q5_MIN, q6_MIN, q7_MIN};
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            qmin_tol[i] = q_min[i] + tol[i];
+            qmax_tol[i] = q_max[i] - tol[i];
+        }
+        for (unsigned int i = 0; i < 7; i++)
+    #elif defined(JML_JOINT_246)
+        const double q_max[7] = {0, q2_MAX, 0, q4_MAX, 0, q6_MAX, 0};
+        const double q_min[7] = {0, q2_MIN, 0, q4_MIN, 0, q6_MIN, 0};
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            qmin_tol[i] = q_min[i] + tol[i];
+            qmax_tol[i] = q_max[i] - tol[i];
+        }
+        for (unsigned int i = 1; i < 7; i + 2)
+    #endif
+        {
+            if ((q[i] > q_min[i]) && (q[i] < qmin_tol[i]))
+                psi_arr[i] = -(2 * (q[i] - qmin_tol[i]) * (qmin_tol[i] - q_min[i])) / pow((q[i] - q_min[i]), 3);
+            else if ((q[i] > qmax_tol[i]) && (q[i] < q_max[i]))
+                psi_arr[i] = -(2 * (q[i] - qmax_tol[i]) * (qmax_tol[i] - q_max[i])) / pow((q[i] - q_max[i]), 3);
+            else
+                psi_arr[i] = 0;
+        }
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0; i < 7; i++)
+            if ((q_max[i] > 0 && q_min[i] < 0) || (q_max[i] < 0 && q_min[i] > 0))
+                psi_tmp[i] = -psi_tmp[i];
+        psi += Ks_BARRIER_JOINT_LIMIT * psi_tmp;
+    }
+
+    void joint_vel_limit_subtask(const Matrix<double> &dq, Matrix<double> &psi)
+    {
+        double psi_arr[7] = {0, 0, 0, 0, 0, 0, 0};
+        Matrix<double> psi_tmp(7, 1);
+        const double tol[7] = {M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8};
+        const double dq_min[7] = {-1.39, -1.39, -1.39, -1.39, -1.22, -1.22, -1.22};
+        const double dq_max[7] = {1.39, 1.39, 1.39, 1.39, 1.22, 1.22, 1.22};
+        double dqmin_tol[7], dqmax_tol[7];
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            dqmin_tol[i] = dq_min[i] + tol[i];
+            dqmax_tol[i] = dq_max[i] - tol[i];
+        }
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            if ((dq[i] > dq_min[i]) && (dq[i] < dqmin_tol[i]))
+                psi_arr[i] = -(2 * (dq[i] - dqmin_tol[i]) * (dqmin_tol[i] - dq_min[i])) / pow((dq[i] - dq_min[i]), 3);
+            else if ((dq[i] > dqmax_tol[i]) && (dq[i] < dq_max[i]))
+                psi_arr[i] = -(2 * (dq[i] - dqmax_tol[i]) * (dqmax_tol[i] - dq_max[i])) / pow((dq[i] - dq_max[i]), 3);
+            else
+                psi_arr[i] = 0;
+        }
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0; i < 7; i++)
+            if ((dq_max[i] > 0 && dq_min[i] < 0) || (dq_max[i] < 0 && dq_min[i] > 0))
+                psi_tmp[i] = -psi_tmp[i];
+        psi += Ks_BARRIER_JOINT_VEL_LIMIT * psi_tmp;
+    }
+
     void manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi)
     {
         Matrix<double> qH(7, 1, MatrixType::General, qH_INITLIST);

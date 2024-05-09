@@ -159,8 +159,10 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                         base_command.mutable_actuators(i)->set_position(base_feedback.actuators(i).position());
 
                     // 控制器參數
-                    lee::joint_angle_limit_psi(position_curr, psi);
-                    lee::manipulability_psi(position_curr, psi);
+                    // lee::joint_angle_limit_psi(position_curr, psi);
+                    // lee::manipulability_psi(position_curr, psi);
+                    lee::joint_limit_subtask(position_curr, psi);
+                    lee::joint_vel_limit_subtask(position_curr, psi);
                     lee::manipulator_config_psi(position_curr, psi);
                     lee::null_space_subtasks(J, Jinv, psi, dq, subtasks);
                     

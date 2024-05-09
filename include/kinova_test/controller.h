@@ -50,9 +50,11 @@
 #define Alpha2 1
 
 // lee's Subtasks Parameters
-#define Ks_MANIPULABILITY 1
-#define Ks_JOINT_LIMIT 1
-#define Ks_MANIPULATOR_CONFIG 0
+#define Ks_MANIPULABILITY 0
+#define Ks_JOINT_LIMIT 0
+#define Ks_BARRIER_JOINT_LIMIT 0.05
+#define Ks_BARRIER_JOINT_VEL_LIMIT 0.05
+#define Ks_MANIPULATOR_CONFIG 10
 #define Ksd_INITLIST \
     {               \
         0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05    \
@@ -140,6 +142,8 @@ namespace lee
     void controller(const Matrix<double> &G, const Matrix<double> &J, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau);
     void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi);
     void manipulability_psi(const Matrix<double> &q, Matrix<double> &psi);
+    void joint_limit_subtask(const Matrix<double> &q, Matrix<double> &psi);
+    void joint_vel_limit_subtask(const Matrix<double> &dq, Matrix<double> &psi);
     void manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi);
     void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks);
 }
