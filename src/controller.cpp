@@ -183,7 +183,7 @@ namespace lee
             qmin_tol[i] = q_min[i] + tol[i];
             qmax_tol[i] = q_max[i] - tol[i];
         }
-        for (unsigned int i = 1; i < 7; i + 2)
+        for (unsigned int i = 1; i < 7; i += 2)
     #endif
         {
             if ((q[i] > q_min[i]) && (q[i] < qmin_tol[i]))
