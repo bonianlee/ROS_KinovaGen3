@@ -159,8 +159,8 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                         base_command.mutable_actuators(i)->set_position(base_feedback.actuators(i).position());
 
                     // 控制器參數
-                    // lee::joint_angle_limit_psi(position_curr, psi);
-                    // lee::manipulability_psi(position_curr, psi);
+                    lee::joint_angle_limit_psi(position_curr, psi);
+                    lee::manipulability_psi(position_curr, psi);
                     lee::joint_limit_subtask(position_curr, psi);
                     lee::joint_vel_limit_subtask(position_curr, psi);
                     lee::manipulator_config_psi(position_curr, psi);
@@ -191,6 +191,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     {
                         kinovaInfo.jointPos[i] = base_feedback.actuators(i).position();
                         position_curr[i] = base_feedback.actuators(i).position() * DEG2RAD;
+                        dq[i] = base_feedback.actuators(i).velocity() * DEG2RAD;
                         if (position_curr[i] > M_PI)
                             position_curr[i] = -(2 * M_PI - position_curr[i]);
                     }
@@ -217,11 +218,8 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     dt = (double)(now - last) / 1000000;
                     dJinv = (Jinv - prev_Jinv) / dt;
                     ddXd = (dXd - prev_dXd) / dt;
-                    for (unsigned i = 0; i < 7; i++)
-                    {
+                    for (unsigned i = 0; i < DOF; i++)
                         W_hat.at(i) += dW_hat.at(i) * dt;
-                        dq[i] = base_feedback.actuators(i).velocity() * DEG2RAD;
-                    }
                     Gamma_lee += dGamma_lee * dt;
                     dX = J * dq;
                     prev_q = q;
