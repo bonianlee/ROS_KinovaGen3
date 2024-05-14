@@ -115,8 +115,8 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
 
         Matrix<double> dXd = humanState.dXd;
         Matrix<double> ddXd(6, 1);
-        Matrix<double> error = Xd - X;
-        Matrix<double> derror = dXd - dX;
+        Matrix<double> error = X - Xd;
+        Matrix<double> derror = dX - dXd;
 
         // 微分前一筆
         Matrix<double> prev_q = q;
@@ -233,8 +233,8 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     //     Xd[i] = X0[i];
 
                     dXd = humanState.dXd;
-                    error = Xd - X;
-                    derror = dXd - dX;
+                    error = X - Xd;
+                    derror = dX - dXd;
 
                     kinova_pub.publish(kinovaInfo);
                     ros::spinOnce(); // 偵測subscriber
