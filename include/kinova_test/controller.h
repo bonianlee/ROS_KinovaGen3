@@ -34,7 +34,25 @@
     }
 #define K1 0.01
 #endif
+// Admittance interface
+#define Madm_INITLIST \
+    {                 \
+        2, 2, 2     \
+    }
+#define Dadm_INITLIST \
+    {                 \
+        0.2, 0.2, 0.2     \
+    }
 
+// non-holonomic pd
+#define P_INITLIST \
+    {              \
+        2, 2     \
+    }
+#define D_INITLIST \
+    {              \
+        2, 2     \
+    }
 
 // lee's RBFNN Parameters
 #define Cj_dxd_UP 3
@@ -137,6 +155,7 @@ namespace chang
 }
 namespace lee
 {
+    // Manipulator Controller
     void get_phi(const Matrix<double> &q, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi);
     void get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat);
     void controller(const Matrix<double> &G, const Matrix<double> &J, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau);
@@ -146,11 +165,19 @@ namespace lee
     void joint_vel_limit_subtask(const Matrix<double> &dq, Matrix<double> &psi);
     void manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi);
     void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks);
+    // Whole-body Controller
+    void wholeBody_controller(const Matrix<double> &G_w, const Matrix<double> &J_w, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau_w);
+    void Admittance_interface(Matrix<double> &dq_p, Matrix<double> &ddq_p, Matrix<double> &tau_w);
+    void calculate_Jp(Matrix<double> &q_p, Matrix<double> &Jp, Matrix<double> &Jp_inv);
+    void non_holonomic_pd(Matrix<double> &dq_p_error, Matrix<double> &ddq_p_error, Matrix<double> &Jp_inv, Matrix<double> &dJp_inv, Matrix<double> &cmd_vel);
+    void admittance2platformVel(Matrix<double> &cmd_vel, geometry_msgs::Twist &twist);
+    void wholeBody_get_phi(const Matrix<double> &q_p, const Matrix<double> &q, const Matrix<double> &dq_p, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi);
+    void wholeBody_get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat);
 }
 void contrller_params(const Matrix<double> &J, const Matrix<double> &Jinv, const Matrix<double> &dJinv, const Matrix<double> &e, const Matrix<double> &de, const Matrix<double> &dq, const Matrix<double> &subtasks, const Matrix<double> &dsubtasks, Matrix<double> &s, Matrix<double> &v, Matrix<double> &a, Matrix<double> &r);
 void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi);
 void manipulability_psi(const Matrix<double> &q, Matrix<double> &psi);
 void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, Matrix<double> &subtasks);
-void humanPos2platformVel(Matrix<double> &Xd, geometry_msgs::Twist &twist);
+void humanPos2platformVel(Matrix<double> &Xd, geometry_msgs::Twist &cmd_vel);
 void emergency_stop(ros::Publisher &platform_pub);
 #endif

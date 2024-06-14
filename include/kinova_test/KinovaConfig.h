@@ -54,6 +54,14 @@ bool move_to_home_position_with_ros(k_api::Base::BaseClient *base, ros::Publishe
 void torque_saturation(Matrix<double> &tau);
 
 /*
+ * 全身控制之輸出扭矩飽和器。
+ *
+ * @param tau: 7*1 的輸出扭矩向量
+ *
+ */
+void wholeBody_torque_saturation(Matrix<double> &tau_w);
+
+/*
  * 重力補償。
  *
  * @param q: 7*1 關節角度
@@ -61,6 +69,15 @@ void torque_saturation(Matrix<double> &tau);
  * @param tau: 7*1 的輸出扭矩向量
  */
 void gravity_compensation(const Matrix<double> &q, const double init_tau[7], Matrix<double> &tau);
+
+/*
+ * 全身控制之機械手臂重力補償。
+ *
+ * @param q_w: 9*1 關節角度
+ * @param init_tau: 7*1 初始扭矩(機械手臂)
+ * @param tau_w: 9*1 的輸出扭矩向量
+ */
+void wholeBody_gravity_compensation(const Matrix<double> &q_w, const double init_tau[7], Matrix<double> &tau_w);
 
 /*
  * 將關節角度轉到 -inf 到 inf。

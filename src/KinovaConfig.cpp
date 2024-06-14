@@ -187,15 +187,34 @@ void torque_saturation(Matrix<double> &tau)
     {
         if (i < 4)
         {
-            // other joints 0-3
+            // other joints 1-4
             if (abs(tau[i]) > 39)
                 tau[i] = tau[i] > 0 ? 39 : -39;
         }
         else
         {
-            // wrist joint 4-7
+            // wrist joint 5-7
             if (abs(tau[i]) > 9)
                 tau[i] = tau[i] > 0 ? 9 : -9;
+        }
+    }
+}
+
+void wholeBody_torque_saturation(Matrix<double> &tau_w)
+{
+    for (int i = 2; i < 9; i++)
+    {
+        if (i < 6)
+        {
+            // other joints 1-4
+            if (abs(tau_w[i]) > 39)
+                tau_w[i] = tau_w[i] > 0 ? 39 : -39;
+        }
+        else
+        {
+            // wrist joint 5-7
+            if (abs(tau_w[i]) > 9)
+                tau_w[i] = tau_w[i] > 0 ? 9 : -9;
         }
     }
 }
@@ -213,6 +232,21 @@ void gravity_compensation(const Matrix<double> &q, const double init_tau[7], Mat
     tau[4] += G[4] + init_tau[4];
     tau[5] += G[5] * 0.95 + init_tau[5] * 0.2;
     tau[6] += G[6] + init_tau[6];
+}
+
+void wholeBody_gravity_compensation(const Matrix<double> &q_w, const double init_tau[7], Matrix<double> &tau_w)
+{
+    double G_arr[7];
+    Matrix<double> G(7, 1);
+    kinova_G_gripper(GRAVITY, q_w[2], q_w[3], q_w[4], q_w[5], q_w[6], q_w[7], q_w[8], G_arr);
+    G.update_from_matlab(G_arr);
+    tau_w[2] += G[0] + init_tau[0] * 0.05;
+    tau_w[3] += G[1] + init_tau[1] * 0.08;
+    tau_w[4] += G[2] + init_tau[2] * 0.1;
+    tau_w[5] += G[3] + init_tau[3] * 0.1;
+    tau_w[6] += G[4] + init_tau[4];
+    tau_w[7] += G[5] * 0.95 + init_tau[5] * 0.2;
+    tau_w[8] += G[6] + init_tau[6];
 }
 
 void q2inf(const Matrix<double> &curr_pos, const Matrix<double> &prev_q, Matrix<int> &round, Matrix<double> &q)

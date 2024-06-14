@@ -12,6 +12,7 @@ public:
     PlatformState();
     Matrix<double> q_p;
     Matrix<double> dq_p;
+    Matrix<double> twist;
     void updatePlatformData(const nav_msgs::Odometry &msg);
 };
 

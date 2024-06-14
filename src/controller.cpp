@@ -59,6 +59,7 @@ namespace chang
 
 namespace lee
 {
+    // Manipulator Controller
     void get_phi(const Matrix<double> &q, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi)
     {
         Matrix<double> X(14 + (2 * DOF) + 1, 1);
@@ -125,7 +126,9 @@ namespace lee
         Matrix<double> Kd(DOF, DOF, MatrixType::Diagonal, Kd_INITLIST);
         Matrix<double> G0 = 0.9 * G;
         // tau = J.transpose() * (Mx * ddxd + Cx * dxd + Gx - Dd * derror - Kd * error - PINV(derror.transpose()) * K1 * (error.transpose() * error));
-        tau = G0 + J.transpose() * (sigma - Dd * derror - Kd * error - vPINV(derror.transpose()) * K1 * (error.transpose() * error)) + subtasks;
+        // tau = G0 + J.transpose() * (sigma - Dd * derror - Kd * error - vPINV(derror.transpose()) * K1 * (error.transpose() * error)) + subtasks;
+        // tau = J.transpose() * (- Dd * derror - Kd * error);
+        tau = J.transpose() * (- Dd * derror - Kd * error) + subtasks;
     }
     
     void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi)
@@ -237,12 +240,143 @@ namespace lee
         psi += Ks_MANIPULATOR_CONFIG * psi_tmp;
     }
 
-    void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
+    void null_space_subtasks(Matrix<double> &Jw, Matrix<double> &Jw_inv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
     {
         Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
         Matrix<double> Ksd(7, 7, MatrixType::Diagonal, Ksd_INITLIST);
-        subtasks = (eye - Jinv * J) * (psi - Ksd * dq);
+        subtasks = (eye - Jw_inv * Jw) * (psi - Ksd * dq);
         psi.zeros();
+    }
+
+    // Whole-body Controller
+    void wholeBody_controller(const Matrix<double> &G_w, const Matrix<double> &J_w, const Matrix<double> &error, const Matrix<double> &derror, const Matrix<double> &sigma, const Matrix<double> &subtasks, Matrix<double> &tau_w)
+    {
+        Matrix<double> Dd(DOF, DOF, MatrixType::Diagonal, Dd_INITLIST);
+        Matrix<double> Kd(DOF, DOF, MatrixType::Diagonal, Kd_INITLIST);
+        Matrix<double> G_w0 = 0.9 * G_w;
+        // tau_w = J_w.transpose() * (Mx * ddxd + Cx * dxd + Gx - Dd * derror - Kd * error - PINV(derror.transpose()) * K1 * (error.transpose() * error));
+        // tau_w = G_w0 + Jw.transpose() * (sigma - Dd * derror - Kd * error - vPINV(derror.transpose()) * K1 * (error.transpose() * error)) + subtasks;
+        // tau_w = J_w.transpose() * (- Dd * derror - Kd * error);
+        tau_w = J_w.transpose() * (- Dd * derror - Kd * error) + subtasks;
+    }
+
+    void Admittance_interface(Matrix<double> &dq_pd, Matrix<double> &ddq_pd, Matrix<double> &tau_w)
+    {
+        Matrix<double> tau_p(3, 1);
+        Matrix<double> Madm(3, 3, MatrixType::Diagonal, Madm_INITLIST);
+        Matrix<double> Dadm(3, 3, MatrixType::Diagonal, Dadm_INITLIST);
+        for (unsigned int i = 0; i < 3; i++)
+            tau_p[i] = tau_w[i];
+        ddq_pd = Madm.inverse() * (-Dadm * dq_pd + tau_p);
+    }
+
+    void calculate_Jp(Matrix<double> &q_p, Matrix<double> &Jp, Matrix<double> &Jp_inv)
+    {
+        for (unsigned int i = 0; i < 6; i++)
+        {
+            if (i == 0)
+                Jp[i] = cos(q_p[2]);
+            else if (i == 2)
+                Jp[i] = sin(q_p[2]);
+            else if (i == 5)
+                Jp[i] = 1;
+            else
+                Jp[i] = 0;
+        }
+        Jp_inv = PINV(Jp);
+    }
+
+    void non_holonomic_pd(Matrix<double> &dq_p_error, Matrix<double> &ddq_p_error, Matrix<double> &Jp_inv, Matrix<double> &dJp_inv, Matrix<double> &cmd_vel)
+    {
+        Matrix<double> P(1, 2, MatrixType::Diagonal, P_INITLIST);
+        Matrix<double> D(1, 2, MatrixType::Diagonal, D_INITLIST);
+        cmd_vel = P * (Jp_inv * dq_p_error) + D * (dJp_inv * dq_p_error + Jp_inv * ddq_p_error);
+    }
+
+    void admittance2platformVel(Matrix<double> &cmd_vel, geometry_msgs::Twist &twist)
+    {
+        // 前進後退
+        if (cmd_vel[0] > PLATFORM_nLINEAR_MAX && cmd_vel[0] < PLATFORM_pLINEAR_MAX)
+            twist.linear.x = cmd_vel[0];
+        else if (cmd_vel[0] < PLATFORM_nLINEAR_MAX)
+            twist.linear.x = PLATFORM_nLINEAR_MAX;
+        else
+            twist.linear.x = PLATFORM_pLINEAR_MAX;
+        // 旋轉
+        if (cmd_vel[1] > PLATFORM_nANGULAR_MAX && cmd_vel[1] < PLATFORM_pANGULAR_MAX)
+            twist.angular.z = cmd_vel[1];
+        else if (cmd_vel[1] < PLATFORM_nANGULAR_MAX)
+            twist.angular.z = PLATFORM_nANGULAR_MAX;
+        else
+            twist.angular.z = PLATFORM_pANGULAR_MAX;
+    }
+
+    void wholeBody_get_phi(const Matrix<double> &q_p, const Matrix<double> &q, const Matrix<double> &dq_p, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi)
+    {
+        Matrix<double> X(16 + (2 * DOF) + 1, 1);
+        for (unsigned i = 0; i < (18 + 2 * DOF); i++)
+        {
+            if (i == 0)
+                X[i] = q_p[2];
+            else if (0 < i && i < 8) 
+                X[i] = q[i - 1];
+            else if (i == 8)
+                X[i] = dq_p[2];
+            else if (8 < i && i < 16)
+                X[i] = dq[i - 9];
+            else if (15 < i && i < (16 + DOF))
+                X[i] = dxd[i - 16];
+            else if ((15 + DOF) < i && i < (16 + 2 * DOF))
+                X[i] = ddxd[i - (16 + DOF)];
+            else
+                X[i] = 1;
+        }
+        for (unsigned i = 0; i < NODE; i++)
+        {
+            Matrix<double> cj(16 + (2 * DOF) + 1, 1);
+            // q_p2
+            cj[0] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+            // q1 ~ q7
+            cj[1] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+            cj[2] = (q2_MIN) + ((q2_MAX-q2_MIN) / (NODE - 1)) * i;
+            cj[3] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+            cj[4] = (q4_MIN) + ((q4_MAX-q4_MIN) / (NODE - 1)) * i;
+            cj[5] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+            cj[6] = (q6_MIN) + ((q6_MAX-q6_MIN) / (NODE - 1)) * i;
+            cj[7] = (-2 * M_PI) + ((4 * M_PI) / (NODE - 1)) * i;
+
+            // dq_p2 平台旋轉速度待定
+            cj[8] = (-1.39) + (2.78 / (NODE - 1)) * i;
+            // dq1 ~ dq7
+            for (unsigned j = 9; j < 13; j++) // joint 1-4
+                cj[j] = (-1.39) + (2.78 / (NODE - 1)) * i;
+            for (unsigned j = 13; j < 16; j++) // joint 5-7
+                cj[j] = (-1.22) + (2.44 / (NODE - 1)) * i;
+            
+            // dxd
+            for (unsigned j = 16; j < (16 + DOF); j++)
+                cj[j] = Cj_dxd_LOW + ((Cj_dxd_UP - Cj_dxd_LOW) / (NODE - 1)) * i;
+            
+            // ddxd
+            for (unsigned j = 16 + DOF; j < (16 + 2 * DOF); j++)
+                cj[j] = Cj_ddxd_LOW + ((Cj_ddxd_UP - Cj_ddxd_LOW) / (NODE - 1)) * i;
+
+            // for adaptive F_ext
+            for (unsigned j = 16 + 2 * DOF; j < (16 + 2 * DOF + 1); j++)
+                cj[j] = Cj_Fext_LOW + ((Cj_Fext_UP - Cj_Fext_LOW) / (NODE - 1)) * i;
+
+            double norm = (X - cj).vec_norm2();
+            phi[i] = exp(-(norm * norm) / (Bj * Bj));
+        }
+    }
+
+    void wholeBody_get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat)
+    {
+        dGamma_lee = -Alpha1 * Gamma_lee + Alpha2 * (phi.transpose() * phi)[0];
+        for (int i = 0; i < DOF; i++)
+            dW_hat.at(i) = -Lambda1_lee * derror[i] * phi;
+        for (int i = 0; i < DOF; i++)
+            dW_hat.at(i) -= Lambda2_lee * abs(dGamma_lee) * W_hat.at(i);
     }
 }
 
@@ -284,23 +418,23 @@ void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double>
     psi.zeros();
 }
 
-void humanPos2platformVel(Matrix<double> &Xd, geometry_msgs::Twist &twist)
+void humanPos2platformVel(Matrix<double> &Xd, geometry_msgs::Twist &cmd_vel)
 {
     // 前進後退
     if (Xd[2] > USER_pZ_MIN)
-        twist.linear.x = PLATFORM_pLINEAR_MAX * (Xd[2] - USER_pZ_MAX) / (USER_pZ_MAX - USER_pZ_MIN) + PLATFORM_pLINEAR_MAX;
+        cmd_vel.linear.x = PLATFORM_pLINEAR_MAX * (Xd[2] - USER_pZ_MAX) / (USER_pZ_MAX - USER_pZ_MIN) + PLATFORM_pLINEAR_MAX;
     else if (Xd[2] < USER_nZ_MIN)
-        twist.linear.x = PLATFORM_nLINEAR_MAX * (Xd[2] - USER_nZ_MAX) / (USER_nZ_MAX - USER_nZ_MIN) + PLATFORM_nLINEAR_MAX;
+        cmd_vel.linear.x = PLATFORM_nLINEAR_MAX * (Xd[2] - USER_nZ_MAX) / (USER_nZ_MAX - USER_nZ_MIN) + PLATFORM_nLINEAR_MAX;
     else
-        twist.linear.x = 0;
+        cmd_vel.linear.x = 0;
 
     // 旋轉
     if (Xd[1] > USER_pY_MIN)
-        twist.angular.z = PLATFORM_pANGULAR_MAX * (Xd[1] - USER_pY_MAX) / (USER_pY_MAX - USER_pY_MIN) + PLATFORM_pANGULAR_MAX;
+        cmd_vel.angular.z = PLATFORM_pANGULAR_MAX * (Xd[1] - USER_pY_MAX) / (USER_pY_MAX - USER_pY_MIN) + PLATFORM_pANGULAR_MAX;
     else if (Xd[1] < USER_nY_MIN)
-        twist.angular.z = PLATFORM_nANGULAR_MAX * (Xd[1] - USER_nY_MAX) / (USER_nY_MAX - USER_nY_MIN) + PLATFORM_nANGULAR_MAX;
+        cmd_vel.angular.z = PLATFORM_nANGULAR_MAX * (Xd[1] - USER_nY_MAX) / (USER_nY_MAX - USER_nY_MIN) + PLATFORM_nANGULAR_MAX;
     else
-        twist.angular.z = 0;
+        cmd_vel.angular.z = 0;
 }
 
 void emergency_stop(ros::Publisher &platform_pub)

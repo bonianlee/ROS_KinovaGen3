@@ -3,23 +3,60 @@
 #include <string>
 #include <vector>
 
-// ros 相關
+// ROS-related
 #include "ros/ros.h"
 #include "kinova_test/kinovaMsg.h"
 #include "std_msgs/Bool.h"
 
-// 自行加入的功能
+// Custom functions
 #include "kinova_test/KinovaConfig.h"
 #include "kinova_test/controller.h"
 #include "kinova_test/conio.h"
 #include "kinova_test/HumanState.h"
+#include "kinova_test/PlatformState.h"
 
-bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::ActuatorConfig::ActuatorConfigClient *actuator_config, ros::Publisher &kinova_pub, HumanState &humanState)
+bool platform_control(ros::Publisher &platform_pub, HumanState &humanState)
 {
-    humanState.current_mode = ControlMode::Manipulator;
-    // ROS
-    kinova_test::kinovaMsg kinovaInfo;
+    cout << "--------- Platform Mode ----------" << endl;
+    ros::Rate loop_rate(10);
+    bool return_status = true;
+    int64_t t_start = GetTickUs(), now = GetTickUs();    // Unit: microsecond
+    double exp_time = (double)(now - t_start) / 1000000; // Unit: second
+    Matrix<double> Xd0 = humanState.Xd;
+    Matrix<double> Xd = humanState.Xd - Xd0;
+    while (ros::ok() && humanState.current_mode == ControlMode::Platform)
+    {
 
+        if (!(humanState.stop) && !_kbhit())
+        {
+            // Calibrating user's initial position
+            if (exp_time < 2)
+            {
+                Xd0 = humanState.Xd;
+                now = GetTickUs();
+                exp_time = (double)(now - t_start) / 1000000;
+            }
+            Xd = humanState.Xd - Xd0;
+            // ROS Publisher
+            geometry_msgs::Twist twist;
+            humanPos2platformVel(Xd, twist);
+            platform_pub.publish(twist);
+            ros::spinOnce();
+            loop_rate.sleep();
+        }
+        else if (humanState.stop || (char)_getch() == 's')
+        {
+            return_status = false;
+            break;
+        }
+    }
+    return return_status;
+}
+
+bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::ActuatorConfig::ActuatorConfigClient *actuator_config, ros::Publisher &kinova_pub, ros::Publisher &platform_pub, HumanState &humanState, PlatformState &platformState)
+{
+    cout << "--------- Manipulator Mode ----------" << endl;
+    kinova_test::kinovaMsg kinovaInfo; // ROS-related
     double init_tau[7];
     bool return_status = true;
 
@@ -40,12 +77,11 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
     k_api::BaseCyclic::Feedback base_feedback;
     k_api::BaseCyclic::Command base_command;
 
-    // 夾爪功能開啟
+    // Setup the gripper on the end-effector
     k_api::GripperCyclic::MotorCommand *gripper_motor_command;
     gripper_motor_command = base_command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
 
     vector<float> commands;
-
     auto servoing_mode = k_api::Base::ServoingModeInformation();
 
     cout << "Initializing the arm for torque control" << endl;
@@ -78,11 +114,15 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
             init_tau[i] = -base_feedback.actuators(i).torque();
         }
 
-        /* ------------ 初始值參數設定開始 ------------ */
-        // 讀取關節角
+        /* ------------ Initializing the parameters start ------------ */
+        // Joint angle
         Matrix<double> position_curr(7, 1); // -pi~pi
         Matrix<int> round(7, 1);            // 圈數
         Matrix<double> q(7, 1), dq(7, 1);   // -inf~inf
+        Matrix<double> q_p(3, 1), dq_p(3, 1); // q_p = [x_p; y_p; phi_p] -inf~inf
+        Matrix<double> q_pd(3, 1), dq_pd(3, 1), ddq_pd(3, 1);
+        Matrix<double> q_w(10, 1), dq_w(10, 1);
+        Matrix<double> cmd_vel(2, 1); // twist:states, cmd_vel:refference. [v; w] (mobile platform)
         for (int i = 0; i < 7; i++)
         {
             position_curr[i] = base_feedback.actuators(i).position() * DEG2RAD;
@@ -90,56 +130,90 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                 position_curr[i] = -(2 * M_PI - position_curr[i]);
         }
         q = position_curr;
-        // 順向運動學
-        Matrix<double> X = forward_kinematic_6dof(position_curr), dX(DOF, 1);
+        q_p = platformState.q_p;
+        dq_p = platformState.dq_p;
+        for (unsigned int i = 0; i < 10; i++)
+        {
+            if (i < 3)
+            {
+                q_w[i] = q_p[i];
+                dq_w[i] = dq_p[i];
+            }
+            else
+            {
+                q_w[i] = q[i - 3];
+                dq_w[i] = dq[i - 3];
+            }
+  
+        }
+        // Forward kinematic
+        double X_arr[6];
+        Matrix<double> X(DOF, 1), dX(DOF, 1);
+        exp_WholeBody_FK(q_p[0], q_p[1], q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
+        X.update_from_matlab(X_arr);
         Matrix<double> X0 = X;
 
-        // Jacobian矩陣
-        double J_arr[42], Jinv_arr[42];
-        Matrix<double> J67(6, 7);
-        Matrix<double> J(DOF, 7), Jinv(7, DOF), dJinv(7, DOF);
-        kinova_J_and_Jinv(position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], J_arr, Jinv_arr);
-        J67.update_from_matlab(J_arr);
-        J = J67;
-        Jinv.update_from_matlab(Jinv_arr);
-
-        // G 矩陣
+        // Whole-Body Jacobian Matrix
+        double Jw_arr[60]; //Jw_inv_arr[60]
+        Matrix<double> Jw_6_10(6, 10);
+        Matrix<double> Jw(DOF, 10), Jw_inv(10, DOF); //dJw_inv(10, DOF)
+        exp_WholeBody_J(q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
+        Jw_6_10.update_from_matlab(Jw_arr);
+#if DOF == 3
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 10; j++)
+                Jw(i, j) = Jw_6_10(i, j);
+        Jw_inv = PINV(Jw);
+#else
+        Jw = Jw_6_10;
+        Jw_inv = PINV(Jw_6_10);
+#endif
+        // Jp:移動平台 [dx, dy, dphi] 與 [v, w] 之間的轉換函數
+        Matrix<double> Jp(3, 2), Jp_inv(2, 3), dJp_inv(2, 3);
+        lee::calculate_Jp(q_p, Jp, Jp_inv);
+        // G_w 矩陣
         double G_arr[7];
         Matrix<double> G(7, 1);
+        Matrix<double> G_w(9, 1, MatrixType::General, {0, 0, 0, 0, 0, 0, 0, 0, 0});
         kinova_G_gripper(GRAVITY, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], G_arr);
         G.update_from_matlab(G_arr);
+        for (unsigned int i = 0; i < 7; i++)
+            G_w(i + 2, 0) = G(i, 0);
 
-        // 目標輸出
+        // Previous data
+        Matrix<double> prev_q = q;
+        Matrix<double> prev_dXd(6, 1);
+        Matrix<double> prev_dq_p_error(2, 1);
+        Matrix<double> prev_Jp_inv(2, 3);
+
+        // Desired trajectory
         Matrix<double> Xd0 = humanState.Xd;
         Matrix<double> Xd = X0 + humanState.Xd - Xd0;
-
         Matrix<double> dXd = humanState.dXd;
         Matrix<double> ddXd(6, 1);
         Matrix<double> error = X - Xd;
         Matrix<double> derror = dX - dXd;
+        Matrix<double> dq_p_error = dq_p - dq_pd;
+        Matrix<double> ddq_p_error(2, 1);
 
-        // 微分前一筆
-        Matrix<double> prev_q = q;
-        Matrix<double> prev_Jinv = Jinv;
-        Matrix<double> prev_dXd(6, 1);
-
-        // 控制器相關
+        // Controller-related
         Matrix<double> psi(7, 1), subtasks(7, 1);
-        std::vector<Matrix<double>> dW_hat, W_hat;
+        std::vector<Matrix<double>> dW_hat, W_hat; // RBFNN-related
         for (int i = 0; i < DOF; i++)
         {
             dW_hat.emplace_back(Matrix<double>(NODE, 1));
             W_hat.emplace_back(Matrix<double>(NODE, 1));
         }
         Matrix<double> phi(NODE, 1);
-        Matrix<double> sigma(DOF, 1), controller_tau(7, 1);
+        Matrix<double> sigma(DOF, 1), controller_tau(9, 1);
         double dGamma_lee, Gamma_lee;
-        /* ------------ 初始值參數設定結束 ------------ */
+        /* ------------ Initializing the parameters end ------------ */
 
-        int64_t t_start = GetTickUs(), now = GetTickUs(), last = now; // 微秒
-        double exp_time = (double)(now - t_start) / 1000000, dt;      // 秒
+        int64_t t_start = GetTickUs(), now = GetTickUs(), last = now; // Unit: microsecond
+        double exp_time = (double)(now - t_start) / 1000000, dt;      // Unit: second
+
         // Real-time loop
-        while (ros::ok())
+        while (ros::ok() && humanState.current_mode == ControlMode::Manipulator)
         {
             if (!(humanState.stop) && !_kbhit())
             {
@@ -147,6 +221,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                 kinovaInfo.time = exp_time;
                 if (now - last > 1000)
                 {
+                    // Calibrating user's initial position
                     if (exp_time < 3)
                         Xd0 = humanState.Xd;
 
@@ -157,36 +232,45 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     for (int i = 0; i < actuator_count; i++)
                         base_command.mutable_actuators(i)->set_position(base_feedback.actuators(i).position());
 
-                    // 控制器參數
+                    // Parameters of controller
                     lee::joint_angle_limit_psi(position_curr, psi);
                     lee::manipulability_psi(position_curr, psi);
                     lee::joint_limit_subtask(position_curr, psi);
                     lee::joint_vel_limit_subtask(position_curr, psi);
                     lee::manipulator_config_psi(position_curr, psi);
-                    lee::null_space_subtasks(J, Jinv, psi, dq, subtasks);
-                    
+                    lee::null_space_subtasks(Jw, Jw_inv, psi, dq, subtasks);
                     // RBFNN
-                    lee::get_phi(q, dq, dXd, ddXd, phi);
-                    lee::get_dW_hat(phi, derror, Gamma_lee, dGamma_lee, W_hat, dW_hat);
+                    for (unsigned i = 0; i < 7; i++)
+                    lee::wholeBody_get_phi(q_p, q, dq_p, dq, dXd, ddXd, phi);
+                    lee::wholeBody_get_dW_hat(phi, derror, Gamma_lee, dGamma_lee, W_hat, dW_hat);
                     for (unsigned i = 0; i < DOF; i ++)
-                        sigma[i] = (W_hat.at(i).transpose() * phi)[0]; 
+                        sigma[i] = (W_hat.at(i).transpose() * phi)[0];
+                    
+                    // Controller
+                    lee::wholeBody_controller(G_w, Jw, error, derror, sigma, subtasks, controller_tau);
+                    wholeBody_gravity_compensation(position_curr, init_tau, controller_tau);
 
-                    // 控制器
-                    lee::controller(G, J, error, derror, sigma, subtasks, controller_tau);
-                    gravity_compensation(position_curr, init_tau, controller_tau);
-
-                    // 設定飽和器
-                    torque_saturation(controller_tau);
-                    // 輸入扭矩
-                    for (int i = 0; i < 7; i++)
+                    // Saturation for the torque
+                    wholeBody_torque_saturation(controller_tau);
+                    // Admittance interface
+                    lee::Admittance_interface(dq_pd, ddq_pd, controller_tau);
+                    // non-holonomic pd
+                    lee::non_holonomic_pd(dq_p_error, ddq_p_error, Jp_inv, dJp_inv, cmd_vel);
+                    // Command torque for the KinovaGen3
+                    for (int i = 2; i < 9; i++)
                     {
                         base_command.mutable_actuators(i)->set_torque_joint(controller_tau[i]);
-                        kinovaInfo.torque[i] = controller_tau[i];
+                        kinovaInfo.torque[i - 2] = controller_tau[i];
                     }
-                    // 夾爪開闔
+                    // Command velocity for the mobile platform
+                    // ROS Publisher
+                    geometry_msgs::Twist twist;
+                    lee::admittance2platformVel(cmd_vel, twist);
+                    platform_pub.publish(twist);
+                    // Command input for the gripper
                     gripper_control(gripper_motor_command, humanState.triggerVal);
 
-                    // 讀取關節角
+                    // Read the joint angles
                     for (int i = 0; i < 7; i++)
                     {
                         kinovaInfo.jointPos[i] = base_feedback.actuators(i).position();
@@ -197,48 +281,67 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     }
                     q2inf(position_curr, prev_q, round, q);
 
-                    // 順向運動學
-                    X = forward_kinematic_6dof(position_curr);
+                    // Read the platform states
+                    q_p = platformState.q_p;
+                    dq_p = platformState.dq_p;
+
+                    // Forward kinematic
+                    exp_WholeBody_FK(q_p[0], q_p[1], q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
+                    X.update_from_matlab(X_arr);
                     kinovaInfo.kinova_X = {X[0], X[1], X[2]};
-                    kinovaInfo.kinova_axis = {X[3], X[4], X[5]};
                     kinovaInfo.kinova_Xd = {Xd[0], Xd[1], Xd[2]};
+                    kinovaInfo.kinova_axis = {X[3], X[4], X[5]};
                     kinovaInfo.kinova_axisd = {Xd[3], Xd[4], Xd[5]};
-                    // 夾爪狀態
+
+                    // The status of the gripper
                     kinovaInfo.gripperPos = base_feedback.interconnect().gripper_feedback().motor(0).position();
 
-                    // Jacobian矩陣
-                    kinova_J_and_Jinv(position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], J_arr, Jinv_arr);
-                    J67.update_from_matlab(J_arr);
-                    J = J67;
-                    Jinv.update_from_matlab(Jinv_arr);
+                    // Jacobian matrix
+                    exp_WholeBody_J(q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
+                    Jw_6_10.update_from_matlab(Jw_arr);
+#if DOF == 3
+                    for (int i = 0; i < 3; i++)
+                        for (int j = 0; j < 10; j++)
+                            Jw(i, j) = Jw_6_10(i, j);
+                    Jw_inv = PINV(Jw);
+#else
+                    Jw = Jw_6_10;
+                    Jw_inv = PINV(Jw_6_10);
+#endif
 
-                    // 更新時間、微分、積分
+                    // Update time, differentiation, and integration
                     now = GetTickUs();
                     exp_time = (double)(now - t_start) / 1000000;
                     dt = (double)(now - last) / 1000000;
-                    dJinv = (Jinv - prev_Jinv) / dt;
                     ddXd = (dXd - prev_dXd) / dt;
+                    ddq_p_error = (dq_p_error - prev_dq_p_error) / dt;
+                    dJp_inv = (Jp_inv - prev_Jp_inv) / dt;
                     for (unsigned i = 0; i < DOF; i++)
                         W_hat.at(i) += dW_hat.at(i) * dt;
-                    Gamma_lee += dGamma_lee * dt;
-                    dX = J * dq;
+                    dq_pd += ddq_pd * dt;
+                    dX = Jw * dq_w;
                     prev_q = q;
-                    prev_Jinv = Jinv;
                     prev_dXd = dXd;
+                    prev_dq_p_error = dq_p_error;
+                    prev_Jp_inv = Jp_inv;
                     last = now;
 
+                    // update Jp & Jp_inv
+                    lee::calculate_Jp(q_p, Jp, Jp_inv);
+
                     Xd = X0 + humanState.Xd - Xd0;
+                    dXd = humanState.dXd;
                     // Fixed the orientation to initialize pose, please uncomment the following code
                     // for (int i = 3; i < 6; i++)
                     //     Xd[i] = X0[i];
 
-                    dXd = humanState.dXd;
                     error = X - Xd;
                     derror = dX - dXd;
+                    dq_p_error = dq_p - dq_pd;
 
+                    // ROS publisher
                     kinova_pub.publish(kinovaInfo);
-                    ros::spinOnce(); // 偵測subscriber
-
+                    ros::spinOnce();
                     // Incrementing identifier ensures actuators can reject out of time frames
                     base_command.set_frame_id(base_command.frame_id() + 1);
                     if (base_command.frame_id() > 65535)
@@ -269,13 +372,10 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     }
                 }
             }
-            else
+            else if (humanState.stop || (char)_getch() == 's')
             {
-                if ((char)_getch() == 's')
-                {
-                    return_status = false;
-                    break;
-                }
+                return_status = false;
+                break;
             }
         }
 
@@ -314,13 +414,17 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
 int main(int argc, char **argv)
 {
     HumanState humanState;
-    // ROS
-    ros::init(argc, argv, "mobileRobotDevice"); // rosnode的名稱
+    PlatformState platformState;
+    // ROS-related
+    ros::init(argc, argv, "mobileManipulatorDevice"); // rosnode的名稱
     ros::NodeHandle n;
-    ros::Publisher kinova_pub = n.advertise<kinova_test::kinovaMsg>("kinovaInfo", 5); // rostopic的名稱(Publish)
+    ros::Publisher platform_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);    // the name of the rostopic for publishing
+    ros::Publisher kinova_pub = n.advertise<kinova_test::kinovaMsg>("kinovaInfo", 5); // the name of the rostopic for publishing
     ros::Subscriber state_sub = n.subscribe("xsens2kinova", 1, &HumanState::updateHumanData, &humanState);
+    ros::Subscriber mode_sub = n.subscribe("controlMode", 1, &HumanState::updateControlMode, &humanState);
     ros::Subscriber trigger_sub = n.subscribe("triggerVal", 1, &HumanState::updateTriggerValue, &humanState);
     ros::Subscriber stop_sub = n.subscribe("stop", 1, &HumanState::updateStopState, &humanState);
+    ros::Subscriber odm_sub = n.subscribe("odom", 1, &PlatformState::updatePlatformData, &platformState);
 
     auto parsed_args = ParseExampleArguments(argc, argv);
 
@@ -363,11 +467,21 @@ int main(int argc, char **argv)
     success &= example_move_to_home_position(base);
     while (success)
     {
-        success &= torque_control(base, base_cyclic, actuator_config, kinova_pub, humanState);
+        if (humanState.current_mode == ControlMode::Platform)
+        {
+            success &= move_to_home_position_with_ros(base, kinova_pub);
+            success &= platform_control(platform_pub, humanState);
+        }
+        else
+        {
+            // emergency_stop(platform_pub);
+            success &= torque_control(base, base_cyclic, actuator_config, kinova_pub, platform_pub, humanState, platformState);
+        }
     }
 
     if (!success)
         cout << "There has been an unexpected error." << endl;
+    emergency_stop(platform_pub);
 
     // Close API session
     session_manager->CloseSession();

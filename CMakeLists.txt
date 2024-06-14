@@ -49,6 +49,8 @@ target_sources(mylibary
   ${PROJECT_SOURCE_DIR}/src/controller.cpp
   ${PROJECT_SOURCE_DIR}/src/conio.c
   ${PROJECT_SOURCE_DIR}/src/HumanState.cpp
+  ${PROJECT_SOURCE_DIR}/src/PlatformState.cpp
+  ${PROJECT_SOURCE_DIR}/src/lee_following_human_control.cpp
 )
 
 ## 連接函式庫
@@ -59,6 +61,8 @@ link_libraries(
   ${PROJECT_SOURCE_DIR}/lib/libKinovaGen3Model.a
   ${PROJECT_SOURCE_DIR}/lib/libkinova_FK_axisAngle.a
   ${PROJECT_SOURCE_DIR}/lib/release/libKortexApiCpp.a
+  ${PROJECT_SOURCE_DIR}/lib/libexp_WholeBody_FK.a
+  ${PROJECT_SOURCE_DIR}/lib/libexp_WholeBody_J.a
   ${catkin_LIBRARIES}
 )
 
@@ -74,3 +78,9 @@ add_executable(following_human_control src/following_human_control.cpp src/utili
 
 # ---------------- following_human_manipulator ------------------
 add_executable(following_human_manipulator src/following_human_manipulator.cpp src/utilities.cpp)
+
+# ---------------- caculate ------------------
+add_executable(caculate src/caculate.cpp src/utilities.cpp)
+
+# ---------------- lee_following_human_control ------------------
+add_executable(lee_following_human_control src/lee_following_human_control.cpp src/utilities.cpp)
