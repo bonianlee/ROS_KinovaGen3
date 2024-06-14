@@ -63,6 +63,13 @@ void kinova_FK(double q1, double q2, double q3, double q4, double q5,
 void kinova_FK_axisAngle(double q1, double q2, double q3, double q4,
                          double q5, double q6, double q7, double X[7]);
 
+void exp_WholeBody_J(double phi_p, double q1, double q2, double q3, double q4,
+                     double q5, double q6, double q7, double Jw[60]);
+
+void exp_WholeBody_FK(double x_p, double y_p, double phi_p, double q1,
+                      double q2, double q3, double q4, double q5, double q6,
+                      double q7, double X[6]);
+
 // Parameters
 enum class KinovaParams
 {
