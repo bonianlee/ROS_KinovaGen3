@@ -254,6 +254,7 @@ void q2inf(const Matrix<double> &curr_pos, const Matrix<double> &prev_q, Matrix<
     q = curr_pos + 2 * M_PI * round;
     for (int i = 0; i < 7; i++)
     {
+        // curr_pos 介於 -pi ~ +pi ，若當前數據減掉前一刻數據是大於 +330 ，則代表角度從 -pi 跨越到 +pi。
         if (q[i] - prev_q[i] > 330 * DEG2RAD)
         {
             q[i] -= 2 * M_PI;
@@ -265,6 +266,24 @@ void q2inf(const Matrix<double> &curr_pos, const Matrix<double> &prev_q, Matrix<
             round[i]++;
         }
     }
+}
+
+void q2inf_p(const double &curr_pos_p, const Matrix<double> &prev_q_p, int &round_p, Matrix<double> &q_p)
+{
+    double prev_phi_p = prev_q_p[2];
+    double phi_p = curr_pos_p + 2 * M_PI * round_p;
+    // curr_pos 介於 -pi ~ +pi ，若當前數據減掉前一刻數據是大於 +330 ，則代表角度從 -pi 跨越到 +pi。
+    if (phi_p - prev_phi_p > 330 * DEG2RAD)
+    {
+        phi_p -= 2 * M_PI;
+        round_p--;
+    }
+    else if (phi_p - prev_phi_p < -330 * DEG2RAD)
+    {
+        phi_p += 2 * M_PI;
+        round_p++;
+    }
+    q_p[2] = phi_p;
 }
 
 void gripper_control(k_api::GripperCyclic::MotorCommand *gripper_motor_command, float triggerVal)

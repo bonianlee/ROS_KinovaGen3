@@ -90,6 +90,16 @@ void wholeBody_gravity_compensation(const Matrix<double> &q_w, const double init
 void q2inf(const Matrix<double> &curr_pos, const Matrix<double> &prev_q, Matrix<int> &round, Matrix<double> &q);
 
 /*
+ * 將移動平台旋轉角度轉到 -inf 到 inf。
+ *
+ * @param curr_pos_p: 當前旋轉角度 (-pi~pi)
+ * @param prev_q_p: 先前旋轉角度 (-inf~inf)
+ * @param round_p: 旋轉圈數
+ * @param q_p: 當前旋轉角度 (-inf~inf)
+ */
+void q2inf_p(const double &curr_pos_p, const Matrix<double> &prev_q_p, int &round_p, Matrix<double> &q_p);
+
+/*
  * Kinova 末端夾爪開闔。
  *
  * @param gripper_motor_command: k_api::GripperCyclic::MotorCommand 指標型態
