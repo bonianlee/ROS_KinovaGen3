@@ -84,3 +84,6 @@ add_executable(caculate src/caculate.cpp src/utilities.cpp)
 
 # ---------------- lee_following_human_control ------------------
 add_executable(lee_following_human_control src/lee_following_human_control.cpp src/utilities.cpp)
+
+# ---------------- mobile_manipulator_speed_tracking ------------------
+add_executable(mobile_manipulator_speed_tracking src/mobile_manipulator_speed_tracking.cpp src/utilities.cpp)

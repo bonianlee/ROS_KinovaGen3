@@ -270,29 +270,6 @@ namespace lee
         ddq_pd = Madm.inverse() * (-Dadm * dq_pd + tau_p);
     }
 
-    void calculate_Jp(Matrix<double> &q_p, Matrix<double> &Jp, Matrix<double> &Jp_inv)
-    {
-        for (unsigned int i = 0; i < 6; i++)
-        {
-            if (i == 0)
-                Jp[i] = cos(q_p[2]);
-            else if (i == 2)
-                Jp[i] = sin(q_p[2]);
-            else if (i == 5)
-                Jp[i] = 1;
-            else
-                Jp[i] = 0;
-        }
-        Jp_inv = PINV(Jp);
-    }
-
-    void non_holonomic_pd(Matrix<double> &dq_p_error, Matrix<double> &ddq_p_error, Matrix<double> &Jp_inv, Matrix<double> &dJp_inv, Matrix<double> &cmd_vel)
-    {
-        Matrix<double> P(1, 2, MatrixType::Diagonal, P_INITLIST);
-        Matrix<double> D(1, 2, MatrixType::Diagonal, D_INITLIST);
-        cmd_vel = P * (Jp_inv * dq_p_error) + D * (dJp_inv * dq_p_error + Jp_inv * ddq_p_error);
-    }
-
     void admittance2platformVel(Matrix<double> &cmd_vel, geometry_msgs::Twist &twist)
     {
         // 前進後退
@@ -377,6 +354,26 @@ namespace lee
             dW_hat.at(i) = -Lambda1_lee * derror[i] * phi;
         for (int i = 0; i < DOF; i++)
             dW_hat.at(i) -= Lambda2_lee * abs(dGamma_lee) * W_hat.at(i);
+    }
+
+    // Mobile platform controller test
+    void reference_cmd_vel(Matrix<double> &dq_pd, Matrix<double> &q_p, int round_p, Matrix<double> &cmd_vel_r)
+    {
+        double theta_d = atan2(dq_pd[1], dq_pd[0]) + 2 * M_PI * round_p; // -inf ~ +inf ，後面的圈數是為了要讓參考角度能夠跟 q_p[2] (也就是 phi_p)在同一圈
+        cmd_vel_r[0] = sqrt(pow(dq_pd[0], 2) + pow(dq_pd[1], 2));
+        cmd_vel_r[1] = Kp * (q_p[2] - theta_d) + dq_pd[2];
+    }
+
+    void mobile_platform_error_tf(Matrix<double> &q_pd, Matrix<double> &q_p, double position_curr_p, Matrix<double> &error_p)
+    {
+        Matrix<double> J_pe(3, 3, MatrixType::General, {cos(position_curr_p), sin(position_curr_p), 0, -sin(position_curr_p), cos(position_curr_p), 0, 0, 0, 1});
+        error_p = J_pe * (q_p - q_pd);
+    }
+
+    void mobile_platform_control_rule(Matrix<double> &q_pd, Matrix<double> &error_p, Matrix<double> &cmd_vel)
+    {
+         Matrix<double> cmd_vel_temp(2, 1, MatrixType::General, {q_pd[0] * cos(error_p[2]) + Kx * error_p[0], q_pd[1] + q_pd[0] * (Ky * error_p[1] + Ktheta * sin(error_p[2]))});
+         cmd_vel = cmd_vel_temp;
     }
 }
 
