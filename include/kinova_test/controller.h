@@ -169,8 +169,8 @@ namespace lee
     void wholeBody_get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat);
     // Mobile platform controller test
     void reference_cmd_vel(Matrix<double> &dq_pd, Matrix<double> &q_p, int round_p, Matrix<double> &cmd_vel_r);
-    void mobile_platform_error_tf(Matrix<double> &q_pd, Matrix<double> &q_p, double position_curr_p, Matrix<double> &error_p);
-    void mobile_platform_control_rule(Matrix<double> &q_pd, Matrix<double> &error_p, Matrix<double> &cmd_vel);
+    void mobile_platform_error_tf(Matrix<double> &error_p, double position_curr_p, Matrix<double> &error_p_tf);
+    void mobile_platform_control_rule(Matrix<double> &cmd_vel_r, Matrix<double> &error_p, Matrix<double> &cmd_vel);
 }
 void contrller_params(const Matrix<double> &J, const Matrix<double> &Jinv, const Matrix<double> &dJinv, const Matrix<double> &e, const Matrix<double> &de, const Matrix<double> &dq, const Matrix<double> &subtasks, const Matrix<double> &dsubtasks, Matrix<double> &s, Matrix<double> &v, Matrix<double> &a, Matrix<double> &r);
 void joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi);

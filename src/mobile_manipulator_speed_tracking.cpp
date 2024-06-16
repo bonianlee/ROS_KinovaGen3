@@ -25,7 +25,7 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_pub
     double exp_time = (double)(now - t_start) / 1000000, dt; // Unit: second
     
     double position_curr_p; // 移動平台當前旋轉方向 -pi~pi
-    int round_p;            // 移動平台旋轉圈數
+    int round_p = 0;            // 移動平台旋轉圈數
     Matrix<double> q_p(3, 1);   // q_p = [x_p; y_p; phi_p] all elements are -inf~inf
     Matrix<double> prev_q_p(3, 1), prev_dq_p(3, 1);   // -inf~inf
     Matrix<double> cmd_vel_r(2, 1), cmd_vel(2, 1);
@@ -64,7 +64,7 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_pub
             {
                 lee::reference_cmd_vel(dq_pd, q_p, round_p, cmd_vel_r);
                 lee::mobile_platform_error_tf(error_p, position_curr_p, error_p_tf);
-                lee::mobile_platform_control_rule(q_pd, error_p_tf, cmd_vel);
+                lee::mobile_platform_control_rule(cmd_vel_r, error_p_tf, cmd_vel);
                 // Update time, differentiation, and integration
                 now = GetTickUs();
                 exp_time = (double)(now - t_start) / 1000000;

@@ -364,15 +364,15 @@ namespace lee
         cmd_vel_r[1] = Kp * (q_p[2] - theta_d) + dq_pd[2];
     }
 
-    void mobile_platform_error_tf(Matrix<double> &q_pd, Matrix<double> &q_p, double position_curr_p, Matrix<double> &error_p)
+    void mobile_platform_error_tf(Matrix<double> &error_p, double position_curr_p, Matrix<double> &error_p_tf)
     {
         Matrix<double> J_pe(3, 3, MatrixType::General, {cos(position_curr_p), sin(position_curr_p), 0, -sin(position_curr_p), cos(position_curr_p), 0, 0, 0, 1});
-        error_p = J_pe * (q_p - q_pd);
+        error_p_tf = J_pe * error_p;
     }
 
-    void mobile_platform_control_rule(Matrix<double> &q_pd, Matrix<double> &error_p, Matrix<double> &cmd_vel)
+    void mobile_platform_control_rule(Matrix<double> &cmd_vel_r, Matrix<double> &error_p, Matrix<double> &cmd_vel)
     {
-         Matrix<double> cmd_vel_temp(2, 1, MatrixType::General, {q_pd[0] * cos(error_p[2]) + Kx * error_p[0], q_pd[1] + q_pd[0] * (Ky * error_p[1] + Ktheta * sin(error_p[2]))});
+         Matrix<double> cmd_vel_temp(2, 1, MatrixType::General, {cmd_vel_r[0] * cos(error_p[2]) + Kx * error_p[0], cmd_vel_r[1] + cmd_vel_r[0] * (Ky * error_p[1] + Ktheta * sin(error_p[2]))});
          cmd_vel = cmd_vel_temp;
     }
 }
