@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
 # 自定義 msg file
 add_message_files(FILES
   kinovaMsg.msg
+  agvMsg.msg
 )
 
 generate_messages(
