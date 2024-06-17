@@ -361,7 +361,7 @@ namespace lee
     {
         double theta_d = atan2(dq_pd[1], dq_pd[0]) + 2 * M_PI * round_p; // -inf ~ +inf ，後面的圈數是為了要讓參考角度能夠跟 q_p[2] (也就是 phi_p)在同一圈
         cmd_vel_r[0] = sqrt(pow(dq_pd[0], 2) + pow(dq_pd[1], 2));
-        cmd_vel_r[1] = Kp * (q_p[2] - theta_d) + dq_pd[2];
+        cmd_vel_r[1] = Kp * (theta_d - q_p[2]) + dq_pd[2];
     }
 
     void mobile_platform_error_tf(Matrix<double> &error_p, double position_curr_p, Matrix<double> &error_p_tf)

@@ -27,12 +27,12 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_pub
     double position_curr_p; // 移動平台當前旋轉方向 -pi~pi
     int round_p = 0;            // 移動平台旋轉圈數
     Matrix<double> q_p(3, 1);   // q_p = [x_p; y_p; phi_p] all elements are -inf~inf
-    Matrix<double> prev_q_p(3, 1), prev_dq_p(3, 1);   // -inf~inf
+    Matrix<double> prev_q_p(3, 1);   // -inf~inf
     Matrix<double> cmd_vel_r(2, 1), cmd_vel(2, 1);
 
     // read translation data
     for (unsigned int i = 0; i < 2; i++)
-                q_p[i] = platformState.q_p[i];
+        q_p[i] = platformState.q_p[i];
     // read rotated data
     position_curr_p = platformState.q_p[2];
     q_p[2] = position_curr_p;
@@ -52,7 +52,7 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_pub
     dq_pd[1] = 0.02 * cos(0.1 * exp_time);
     dq_pd[2] = 0.5;
 
-    Matrix<double> error_p = q_p - q_pd;
+    Matrix<double> error_p = q_pd - q_p;
     Matrix<double> error_p_tf(3, 1);
 
     while (ros::ok())
@@ -100,7 +100,7 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_pub
                     dq_pd[2] = 0;
                 }
 
-                error_p = q_p - q_pd;
+                error_p = q_pd - q_p;
 
                 // debug----------------------------
                 cout << "--------------------------" << endl;
