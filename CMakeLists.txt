@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(FILES
   kinovaMsg.msg
   agvMsg.msg
+  HandPosMsg.msg
 )
 
 generate_messages(
