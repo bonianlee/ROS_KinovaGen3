@@ -42,17 +42,26 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
     // reference trajectory and velocity
     Matrix<double> q_pd0(3, 1);
     Matrix<double> q_pd(3, 1), dq_pd(3, 1);
-    q_pd0[0] = -0.2 * cos(0.1 * 0);
-    q_pd0[1] = -0.2 * sin(0.1 * 0);
-    q_pd0[2] = -0;
+    // q_pd0[0] = -0.5 * cos(0.1 * 0);
+    // q_pd0[1] = -0.5 * sin(0.1 * 0);
+    // q_pd0[2] = -0;
+    q_pd0[0] = -0.3 * cos(0.15 * M_PI * 0);
+    q_pd0[1] = -0.2 * sin(0.075 * M_PI * 0);
+    q_pd0[2] = 0.3 * cos(0.05 * M_PI * 0);
 
-    q_pd[0] = 0.2 * cos(0.1 * exp_time) + q_pd0[0];
-    q_pd[1] = 0.2 * sin(0.1 * exp_time) + q_pd0[1];
-    q_pd[2] = 0.5 * exp_time + q_pd0[2];
+    // q_pd[0] = 0.5 * cos(0.1 * exp_time) + q_pd0[0];
+    // q_pd[1] = 0.5 * sin(0.1 * exp_time) + q_pd0[1];
+    // q_pd[2] = 0.1 * exp_time + q_pd0[2];
+    q_pd[0] = 0.3 * cos(0.15 * M_PI * exp_time) + q_pd0[0];
+    q_pd[1] = 0.2 * sin(0.075 * M_PI * exp_time) + q_pd0[1];
+    q_pd[2] = -0.3 * cos(0.05 * M_PI * exp_time) + q_pd0[2];
 
-    dq_pd[0] = -0.02 * sin(0.1 * exp_time);
-    dq_pd[1] = 0.02 * cos(0.1 * exp_time);
-    dq_pd[2] = 0.5;
+    // dq_pd[0] = -0.05 * sin(0.1 * exp_time);
+    // dq_pd[1] = 0.05 * cos(0.1 * exp_time);
+    // dq_pd[2] = 0.1;
+    dq_pd[0] = -0.045 * M_PI * sin(0.15 * M_PI * exp_time);
+    dq_pd[1] = 0.015 * M_PI * cos(0.075 * M_PI * exp_time);
+    dq_pd[2] = 0.015 * M_PI * sin(0.05 * M_PI * exp_time);
 
     Matrix<double> error_p = q_pd - q_p;
     Matrix<double> error_p_tf(3, 1);
@@ -83,21 +92,31 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
                 position_curr_p = platformState.q_p[2];
                 q2inf_p(position_curr_p, prev_q_p, round_p, q_p);
 
-                if (exp_time < 50)
+                if (exp_time < 20)
                 {
-                    q_pd[0] = 0.2 * cos(0.1 * exp_time) + q_pd0[0];
-                    q_pd[1] = 0.2 * sin(0.1 * exp_time) + q_pd0[1];
-                    q_pd[2] = 0.5 * exp_time + q_pd0[2];
+                    // q_pd[0] = 0.5 * cos(0.1 * exp_time) + q_pd0[0];
+                    // q_pd[1] = 0.5 * sin(0.1 * exp_time) + q_pd0[1];
+                    // q_pd[2] = 0.1 * exp_time + q_pd0[2];
+                    q_pd[0] = 0.3 * cos(0.15 * M_PI * exp_time) + q_pd0[0];
+                    q_pd[1] = 0.2 * sin(0.075 * M_PI * exp_time) + q_pd0[1];
+                    q_pd[2] = -0.3 * cos(0.05 * M_PI * exp_time) + q_pd0[2];
 
-                    dq_pd[0] = -0.02 * sin(0.1 * exp_time);
-                    dq_pd[1] = 0.02 * cos(0.1 * exp_time);
-                    dq_pd[2] = 0.5;
+                    // dq_pd[0] = -0.05 * sin(0.1 * exp_time);
+                    // dq_pd[1] = 0.05 * cos(0.1 * exp_time);
+                    // dq_pd[2] = 0.1;
+                    dq_pd[0] = -0.045 * M_PI * sin(0.15 * M_PI * exp_time);
+                    dq_pd[1] = 0.015 * M_PI * cos(0.075 * M_PI * exp_time);
+                    dq_pd[2] = 0.015 * M_PI * sin(0.05 * M_PI * exp_time);
                 }
                 else
                 {
-                    q_pd[0] = 0.2 * cos(0.1 * 50) + q_pd0[0];
-                    q_pd[1] = 0.2 * sin(0.1 * 50) + q_pd0[1];
-                    q_pd[2] = 0.5 * 50 + q_pd0[2];
+                    // q_pd[0] = 0.5 * cos(0.1 * 20) + q_pd0[0];
+                    // q_pd[1] = 0.5 * sin(0.1 * 20) + q_pd0[1];
+                    // q_pd[2] = 0.1 * 20 + q_pd0[2];
+                    q_pd[0] = 0.3 * cos(0.15 * M_PI * 20) + q_pd0[0];
+                    q_pd[1] = 0.2 * sin(0.075 * M_PI * 20) + q_pd0[1];
+                    q_pd[2] = -0.3 * cos(0.05 * M_PI * 20) + q_pd0[2];
+
 
                     dq_pd[0] = 0;
                     dq_pd[1] = 0;
@@ -106,11 +125,18 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
 
                 error_p = q_pd - q_p;
 
+                // ROS Publisher
+                geometry_msgs::Twist twist;
+                lee::admittance2platformVel(cmd_vel, twist);
+                lee::mobile_platform_kinematic(position_curr_p, twist, dq_p);
+                
                 // Update to ROS
                 agvInfo.agv_axis = {q_p[0], q_p[1], q_p[2]};
                 agvInfo.agv_axisd = {q_pd[0], q_pd[1], q_pd[2]};
                 agvInfo.agv_axisVel = {dq_p[0], dq_p[1], dq_p[2]};
                 agvInfo.agv_axisdVel = {dq_pd[0], dq_pd[1], dq_pd[2]};
+                agvInfo.cmd_vel = {cmd_vel[0], cmd_vel[1]};
+                agvInfo.twist = {twist.linear.x, twist.angular.z};
 
                 // debug----------------------------
                 cout << "--------------------------" << endl;
@@ -118,18 +144,26 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
                 for (unsigned int i = 0; i < 3; i++)
                     cout << error_p[i] << ",";
                 cout << endl;
+                cout << "error_p_tf:";
+                for (unsigned int i = 0; i < 3; i++)
+                    cout << error_p_tf[i] << ",";
+                cout << endl;
+                cout << "cmd_vel:";
+                for (unsigned int i = 0; i < 2; i++)
+                    cout << cmd_vel[i] << ",";
+                cout << endl;
+                cout << "twist:";
+                cout << twist.linear.x << "," << twist.angular.z << ",";
+                cout << endl;
+                cout << "q_p:";
+                for (unsigned int i = 0; i < 3; i++)
+                    cout << q_p[i] << ",";
+                cout << endl;
                 // debug----------------------------
                 
-                // ROS Publisher
-                geometry_msgs::Twist twist;
-                lee::admittance2platformVel(cmd_vel, twist);
+
                 platform_cmd_pub.publish(twist);
                 platform_state_pub.publish(agvInfo);
-
-                // Update to ROS
-                agvInfo.cmd_vel = {cmd_vel[0], cmd_vel[1]};
-                agvInfo.twist = {twist.linear.x, twist.angular.z};
-
                 ros::spinOnce();
                 loop_rate.sleep();
             }

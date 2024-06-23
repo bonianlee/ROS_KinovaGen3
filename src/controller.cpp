@@ -361,7 +361,10 @@ namespace lee
     {
         double theta_d = atan2(dq_pd[1], dq_pd[0]) + 2 * M_PI * round_p; // -inf ~ +inf ，後面的圈數是為了要讓參考角度能夠跟 q_p[2] (也就是 phi_p)在同一圈
         cmd_vel_r[0] = sqrt(pow(dq_pd[0], 2) + pow(dq_pd[1], 2));
-        cmd_vel_r[1] = Kp * (theta_d - q_p[2]) + dq_pd[2];
+        if (dq_pd[1] != 0 || dq_pd[0] != 0)
+            cmd_vel_r[1] = Kp * (theta_d - q_p[2]) + dq_pd[2];
+        else
+            cmd_vel_r[1] = dq_pd[2];
     }
 
     void mobile_platform_error_tf(Matrix<double> &error_p, double position_curr_p, Matrix<double> &error_p_tf)
@@ -370,10 +373,17 @@ namespace lee
         error_p_tf = J_pe * error_p;
     }
 
-    void mobile_platform_control_rule(Matrix<double> &cmd_vel_r, Matrix<double> &error_p, Matrix<double> &cmd_vel)
+    void mobile_platform_control_rule(Matrix<double> &cmd_vel_r, Matrix<double> &error_p_tf, Matrix<double> &cmd_vel)
     {
-         Matrix<double> cmd_vel_temp(2, 1, MatrixType::General, {cmd_vel_r[0] * cos(error_p[2]) + Kx * error_p[0], cmd_vel_r[1] + cmd_vel_r[0] * (Ky * error_p[1] + Ktheta * sin(error_p[2]))});
+         Matrix<double> cmd_vel_temp(2, 1, MatrixType::General, {cmd_vel_r[0] * cos(error_p_tf[2]) + Kx * error_p_tf[0], cmd_vel_r[1] + cmd_vel_r[0] * (Ky * error_p_tf[1] + Ktheta * sin(error_p_tf[2]))});
          cmd_vel = cmd_vel_temp;
+    }
+
+    void mobile_platform_kinematic(double position_curr_p, geometry_msgs::Twist &twist, Matrix<double> &dq_p)
+    {
+        Matrix<double> J_pk(3, 2, MatrixType::General, {cos(position_curr_p), 0, sin(position_curr_p), 0, 0, 1});
+        Matrix<double> cmd_twist(2, 1, MatrixType::General, {twist.linear.x, twist.angular.z});
+        dq_p = J_pk * cmd_twist;
     }
 }
 
