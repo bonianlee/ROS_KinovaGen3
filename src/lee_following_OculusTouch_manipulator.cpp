@@ -114,7 +114,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         Matrix<double> Xd0 = oculusState.Xd;
         Matrix<double> Xd = X0 + oculusState.Xd - Xd0;
 
-        Matrix<double> dXd = humanState.dXd; // 透過微分求得
+        Matrix<double> dXd(6, 1); // 透過微分求得
         Matrix<double> ddXd(6, 1);
         Matrix<double> error = X - Xd;
         Matrix<double> derror = dX - dXd;
@@ -122,6 +122,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         // 微分前一筆
         Matrix<double> prev_q = q;
         Matrix<double> prev_Jinv = Jinv;
+        Matrix<double> prev_Xd(6, 1);
         Matrix<double> prev_dXd(6, 1);
 
         // 控制器相關
@@ -218,6 +219,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     exp_time = (double)(now - t_start) / 1000000;
                     dt = (double)(now - last) / 1000000;
                     dJinv = (Jinv - prev_Jinv) / dt;
+                    dXd = (Xd - prev_Xd) / dt;
                     ddXd = (dXd - prev_dXd) / dt;
                     for (unsigned i = 0; i < DOF; i++)
                         W_hat.at(i) += dW_hat.at(i) * dt;
@@ -225,6 +227,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     dX = J * dq;
                     prev_q = q;
                     prev_Jinv = Jinv;
+                    prev_Xd = Xd;
                     prev_dXd = dXd;
                     last = now;
 
@@ -233,7 +236,6 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     // for (int i = 3; i < 6; i++)
                     //     Xd[i] = X0[i];
 
-                    dXd = humanState.dXd;
                     error = X - Xd;
                     derror = dX - dXd;
 
