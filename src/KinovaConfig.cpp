@@ -202,9 +202,9 @@ void torque_saturation(Matrix<double> &tau)
 
 void wholeBody_torque_saturation(Matrix<double> &tau_w)
 {
-    for (int i = 2; i < 9; i++)
+    for (int i = 3; i < 10; i++)
     {
-        if (i < 6)
+        if (i < 7)
         {
             // other joints 1-4
             if (abs(tau_w[i]) > 39)
@@ -238,15 +238,15 @@ void wholeBody_gravity_compensation(const Matrix<double> &q_w, const double init
 {
     double G_arr[7];
     Matrix<double> G(7, 1);
-    kinova_G_gripper(GRAVITY, q_w[2], q_w[3], q_w[4], q_w[5], q_w[6], q_w[7], q_w[8], G_arr);
+    kinova_G_gripper(GRAVITY, q_w[3], q_w[4], q_w[5], q_w[6], q_w[7], q_w[8], q_w[9], G_arr);
     G.update_from_matlab(G_arr);
-    tau_w[2] += G[0] + init_tau[0] * 0.05;
-    tau_w[3] += G[1] + init_tau[1] * 0.08;
-    tau_w[4] += G[2] + init_tau[2] * 0.1;
-    tau_w[5] += G[3] + init_tau[3] * 0.1;
-    tau_w[6] += G[4] + init_tau[4];
-    tau_w[7] += G[5] * 0.95 + init_tau[5] * 0.2;
-    tau_w[8] += G[6] + init_tau[6];
+    tau_w[3] += G[0] + init_tau[0] * 0.05;
+    tau_w[4] += G[1] + init_tau[1] * 0.08;
+    tau_w[5] += G[2] + init_tau[2] * 0.1;
+    tau_w[6] += G[3] + init_tau[3] * 0.1;
+    tau_w[7] += G[4] + init_tau[4];
+    tau_w[8] += G[5] * 0.95 + init_tau[5] * 0.2;
+    tau_w[9] += G[6] + init_tau[6];
 }
 
 void q2inf(const Matrix<double> &curr_pos, const Matrix<double> &prev_q, Matrix<int> &round, Matrix<double> &q)
