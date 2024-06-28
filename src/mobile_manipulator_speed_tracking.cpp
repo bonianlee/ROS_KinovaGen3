@@ -81,8 +81,9 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
                 now = GetTickUs();
                 exp_time = (double)(now - t_start) / 1000000;
                 dt = (double)(now - last) / 1000000;
-                dq_p = (q_p - prev_q_p) / dt;
+                // dq_p = (q_p - prev_q_p) / dt;
                 prev_q_p = q_p;
+                last = now;
 
                 // Update the platform's data
                 // for translation data
