@@ -17,28 +17,28 @@
 #include "kinova_test/PlatformState.h"
 #include "kinova_test/HumanHandPos.h"
 
-bool platform_control(ros::Publisher &platform_cmd_pub, HumanState &humanState)
+bool platform_control(ros::Publisher &platform_cmd_pub, HumanHandPos &oculusState)
 {
     cout << "--------- Platform Mode ----------" << endl;
     ros::Rate loop_rate(10);
     bool return_status = true;
     int64_t t_start = GetTickUs(), now = GetTickUs();    // Unit: microsecond
     double exp_time = (double)(now - t_start) / 1000000; // Unit: second
-    Matrix<double> Xd0 = humanState.Xd;
-    Matrix<double> Xd = humanState.Xd - Xd0;
-    while (ros::ok() && humanState.current_mode == ControlMode::Platform)
+    Matrix<double> Xd0 = oculusState.Xd;
+    Matrix<double> Xd = oculusState.Xd - Xd0;
+    while (ros::ok() && oculusState.current_mode == lee_ControlMode::Platform)
     {
 
-        if (!(humanState.stop) && !_kbhit())
+        if (!(oculusState.stop) && !_kbhit())
         {
             // Calibrating user's initial position
             if (exp_time < 2)
             {
-                Xd0 = humanState.Xd;
+                Xd0 = oculusState.Xd;
                 now = GetTickUs();
                 exp_time = (double)(now - t_start) / 1000000;
             }
-            Xd = humanState.Xd - Xd0;
+            Xd = oculusState.Xd - Xd0;
             // ROS Publisher
             geometry_msgs::Twist twist;
             humanPos2platformVel(Xd, twist);
@@ -46,7 +46,7 @@ bool platform_control(ros::Publisher &platform_cmd_pub, HumanState &humanState)
             ros::spinOnce();
             loop_rate.sleep();
         }
-        else if (humanState.stop || (char)_getch() == 's')
+        else if (oculusState.stop || (char)_getch() == 's')
         {
             return_status = false;
             break;
@@ -159,7 +159,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         // Forward kinematic
         double X_arr[6];
         Matrix<double> X(DOF, 1), dX(DOF, 1);
-        exp_WholeBody_FK(q_p[0], q_p[1], q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
+        exp_WholeBody_FK(q_p[0], q_p[1], position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
         X.update_from_matlab(X_arr);
         Matrix<double> X0 = X;
 
@@ -167,7 +167,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         double Jw_arr[60]; //Jw_inv_arr[60]
         Matrix<double> Jw_6_10(6, 10);
         Matrix<double> Jw(DOF, 10), Jw_inv(10, DOF); //dJw_inv(10, DOF)
-        exp_WholeBody_J(q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
+        exp_WholeBody_J(position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
         Jw_6_10.update_from_matlab(Jw_arr);
 #if DOF == 3
         for (int i = 0; i < 3; i++)
@@ -181,11 +181,11 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         // G_w 矩陣
         double G_arr[7];
         Matrix<double> G(7, 1);
-        Matrix<double> G_w(9, 1, MatrixType::General, {0, 0, 0, 0, 0, 0, 0, 0, 0});
+        Matrix<double> G_w(10, 1, MatrixType::General, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
         kinova_G_gripper(GRAVITY, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], G_arr);
         G.update_from_matlab(G_arr);
         for (unsigned int i = 0; i < 7; i++)
-            G_w(i + 2, 0) = G(i, 0);
+            G_w(i + 3, 0) = G(i, 0);
 
         // Previous data
         Matrix<double> prev_q = q;
@@ -205,7 +205,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         Matrix<double> error_p_tf(3, 1);
 
         // Controller-related
-        Matrix<double> psi(7, 1), subtasks(7, 1);
+        Matrix<double> psi(10, 1), subtasks(10, 1);
         std::vector<Matrix<double>> dW_hat, W_hat; // RBFNN-related
         for (int i = 0; i < DOF; i++)
         {
@@ -242,12 +242,12 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                         base_command.mutable_actuators(i)->set_position(base_feedback.actuators(i).position());
 
                     // Parameters of controller
-                    lee::joint_angle_limit_psi(position_curr, psi);
-                    lee::manipulability_psi(position_curr, psi);
-                    lee::joint_limit_subtask(position_curr, psi);
-                    lee::joint_vel_limit_subtask(position_curr, psi);
-                    lee::manipulator_config_psi(position_curr, psi);
-                    lee::null_space_subtasks(Jw, Jw_inv, psi, dq, subtasks);
+                    lee::WholeBody_joint_angle_limit_psi(position_curr, psi);
+                    lee::WholeBody_manipulability_psi(position_curr, psi);
+                    lee::WholeBody_joint_limit_subtask(position_curr, psi);
+                    lee::WholeBody_joint_vel_limit_subtask(position_curr, psi);
+                    lee::WholeBody_manipulator_config_psi(position_curr, psi);
+                    lee::WholeBody_null_space_subtasks(Jw, Jw_inv, psi, dq_w, subtasks);
                     // RBFNN
                     for (unsigned i = 0; i < 7; i++)
                     lee::wholeBody_get_phi(q_p, q, dq_p, dq, dXd, ddXd, phi);
@@ -293,7 +293,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     q2inf(position_curr, prev_q, round, q);
 
                     // Forward kinematic
-                    exp_WholeBody_FK(q_p[0], q_p[1], q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
+                    exp_WholeBody_FK(q_p[0], q_p[1], position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
                     X.update_from_matlab(X_arr);
                     kinovaInfo.kinova_X = {X[0], X[1], X[2]};
                     kinovaInfo.kinova_Xd = {Xd[0], Xd[1], Xd[2]};
@@ -304,7 +304,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     kinovaInfo.gripperPos = base_feedback.interconnect().gripper_feedback().motor(0).position();
 
                     // Jacobian matrix
-                    exp_WholeBody_J(q_p[2], position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
+                    exp_WholeBody_J(position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
                     Jw_6_10.update_from_matlab(Jw_arr);
 #if DOF == 3
                     for (int i = 0; i < 3; i++)
@@ -326,6 +326,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     for (unsigned i = 0; i < DOF; i++)
                         W_hat.at(i) += dW_hat.at(i) * dt;
                     dq_pd += ddq_pd * dt;
+                    q_pd += dq_pd * dt;
                     dX = Jw * dq_w;
                     prev_q = q;
                     prev_Xd = Xd;
@@ -434,7 +435,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
 
 int main(int argc, char **argv)
 {
-    HumanState humanState;
+    // HumanState humanState;
     HumanHandPos oculusState;
     PlatformState platformState;
     // ROS-related
@@ -494,7 +495,7 @@ int main(int argc, char **argv)
         if (oculusState.current_mode == lee_ControlMode::Platform)
         {
             success &= move_to_home_position_with_ros(base, kinova_pub);
-            success &= platform_control(platform_cmd_pub, humanState);
+            success &= platform_control(platform_cmd_pub, oculusState);
         }
         else
         {

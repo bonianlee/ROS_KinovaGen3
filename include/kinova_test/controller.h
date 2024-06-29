@@ -5,6 +5,7 @@
 #include "kinova_test/Matrix.h"
 #include "kinova_test/KinovaGen3Model.h"
 #include "kinova_test/HumanState.h"
+#include "kinova_test/HumanHandPos.h"
 #include "ros/ros.h"
 #include "geometry_msgs/Twist.h"
 
@@ -72,6 +73,10 @@
 #define Ksd_INITLIST \
     {               \
         0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05    \
+    }
+#define WholeBody_Ksd_INITLIST \
+    {               \
+        0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05    \
     }
 #define qH_INITLIST \
     {               \
@@ -167,6 +172,12 @@ namespace lee
     void admittance2platformVel(Matrix<double> &cmd_vel, geometry_msgs::Twist &twist);
     void wholeBody_get_phi(const Matrix<double> &q_p, const Matrix<double> &q, const Matrix<double> &dq_p, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi);
     void wholeBody_get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat);
+    void WholeBody_null_space_subtasks(Matrix<double> &Jw, Matrix<double> &Jw_inv, Matrix<double> &psi, const Matrix<double> &dq_w, Matrix<double> &subtasks);
+    void WholeBody_manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi);
+    void WholeBody_joint_vel_limit_subtask(const Matrix<double> &dq, Matrix<double> &psi);
+    void WholeBody_joint_limit_subtask(const Matrix<double> &q, Matrix<double> &psi);
+    void WholeBody_manipulability_psi(const Matrix<double> &q, Matrix<double> &psi);
+    void WholeBody_joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi);
     // Mobile platform controller test
     void reference_cmd_vel(Matrix<double> &dq_pd, Matrix<double> &q_p, int round_p, Matrix<double> &cmd_vel_r);
     void mobile_platform_error_tf(Matrix<double> &error_p, double position_curr_p, Matrix<double> &error_p_tf);

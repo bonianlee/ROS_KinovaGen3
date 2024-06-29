@@ -240,11 +240,11 @@ namespace lee
         psi += Ks_MANIPULATOR_CONFIG * psi_tmp;
     }
 
-    void null_space_subtasks(Matrix<double> &Jw, Matrix<double> &Jw_inv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
+    void null_space_subtasks(Matrix<double> &J, Matrix<double> &J_inv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
     {
         Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
         Matrix<double> Ksd(7, 7, MatrixType::Diagonal, Ksd_INITLIST);
-        subtasks = (eye - Jw_inv * Jw) * (psi - Ksd * dq);
+        subtasks = (eye - J_inv * J) * (psi - Ksd * dq);
         psi.zeros();
     }
 
@@ -354,6 +354,138 @@ namespace lee
             dW_hat.at(i) = -Lambda1_lee * derror[i] * phi;
         for (int i = 0; i < DOF; i++)
             dW_hat.at(i) -= Lambda2_lee * abs(dGamma_lee) * W_hat.at(i);
+    }
+
+    void WholeBody_null_space_subtasks(Matrix<double> &Jw, Matrix<double> &Jw_inv, Matrix<double> &psi, const Matrix<double> &dq_w, Matrix<double> &subtasks)
+    {
+        Matrix<double> eye(10, 10, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
+        Matrix<double> Ksd(10, 10, MatrixType::Diagonal, WholeBody_Ksd_INITLIST);
+        subtasks = (eye - Jw_inv * Jw) * (psi - Ksd * dq_w);
+        psi.zeros();
+    }
+
+    void WholeBody_manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        Matrix<double> qH(7, 1, MatrixType::General, qH_INITLIST);
+        Matrix<double> psi_tmp(7, 1);
+        Matrix<double> psi_tmp_1(10, 1);
+        psi_tmp = qH - q;
+        for (unsigned int i = 3; i < 10; i++)
+            psi_tmp_1[i] = psi_tmp[i - 3];
+        psi += Ks_MANIPULATOR_CONFIG * psi_tmp_1;
+    }
+
+    void WholeBody_joint_vel_limit_subtask(const Matrix<double> &dq, Matrix<double> &psi)
+    {
+        double psi_arr[7] = {0, 0, 0, 0, 0, 0, 0};
+        Matrix<double> psi_tmp(7, 1);
+        Matrix<double> psi_tmp_1(10, 1);
+        const double tol[7] = {M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8, M_PI / 8};
+        const double dq_min[7] = {-1.39, -1.39, -1.39, -1.39, -1.22, -1.22, -1.22};
+        const double dq_max[7] = {1.39, 1.39, 1.39, 1.39, 1.22, 1.22, 1.22};
+        double dqmin_tol[7], dqmax_tol[7];
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            dqmin_tol[i] = dq_min[i] + tol[i];
+            dqmax_tol[i] = dq_max[i] - tol[i];
+        }
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            if ((dq[i] > dq_min[i]) && (dq[i] < dqmin_tol[i]))
+                psi_arr[i] = -(2 * (dq[i] - dqmin_tol[i]) * (dqmin_tol[i] - dq_min[i])) / pow((dq[i] - dq_min[i]), 3);
+            else if ((dq[i] > dqmax_tol[i]) && (dq[i] < dq_max[i]))
+                psi_arr[i] = -(2 * (dq[i] - dqmax_tol[i]) * (dqmax_tol[i] - dq_max[i])) / pow((dq[i] - dq_max[i]), 3);
+            else
+                psi_arr[i] = 0;
+        }
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0; i < 7; i++)
+            if ((dq_max[i] > 0 && dq_min[i] < 0) || (dq_max[i] < 0 && dq_min[i] > 0))
+                psi_tmp[i] = -psi_tmp[i];
+        for (unsigned int i = 3; i < 10; i++)
+            psi_tmp_1[i] = psi_tmp[i - 3];
+        psi += Ks_BARRIER_JOINT_VEL_LIMIT * psi_tmp_1;
+    }
+
+    void WholeBody_joint_limit_subtask(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        double psi_arr[7] = {0, 0, 0, 0, 0, 0, 0};
+        Matrix<double> psi_tmp(7, 1);
+        Matrix<double> psi_tmp_1(10, 1);
+        const double tol[7] = {10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180, 10 * M_PI / 180};
+        double qmin_tol[7], qmax_tol[7];
+        // Matrix<double> tol(7, 1, MatrixType::General, {10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180, 10*M_PI/180});
+    #ifdef JML_JOINT_ALL
+        const double q_max[7] = {q1_MAX, q2_MAX, q3_MAX, q4_MAX, q5_MAX, q6_MAX, q7_MAX};
+        const double q_min[7] = {q1_MIN, q2_MIN, q3_MIN, q4_MIN, q5_MIN, q6_MIN, q7_MIN};
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            qmin_tol[i] = q_min[i] + tol[i];
+            qmax_tol[i] = q_max[i] - tol[i];
+        }
+        for (unsigned int i = 0; i < 7; i++)
+    #elif defined(JML_JOINT_246)
+        const double q_max[7] = {0, q2_MAX, 0, q4_MAX, 0, q6_MAX, 0};
+        const double q_min[7] = {0, q2_MIN, 0, q4_MIN, 0, q6_MIN, 0};
+        for (unsigned int i = 0; i < 7; i++)
+        {
+            qmin_tol[i] = q_min[i] + tol[i];
+            qmax_tol[i] = q_max[i] - tol[i];
+        }
+        for (unsigned int i = 1; i < 7; i += 2)
+    #endif
+        {
+            if ((q[i] > q_min[i]) && (q[i] < qmin_tol[i]))
+                psi_arr[i] = -(2 * (q[i] - qmin_tol[i]) * (qmin_tol[i] - q_min[i])) / pow((q[i] - q_min[i]), 3);
+            else if ((q[i] > qmax_tol[i]) && (q[i] < q_max[i]))
+                psi_arr[i] = -(2 * (q[i] - qmax_tol[i]) * (qmax_tol[i] - q_max[i])) / pow((q[i] - q_max[i]), 3);
+            else
+                psi_arr[i] = 0;
+        }
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0; i < 7; i++)
+            if ((q_max[i] > 0 && q_min[i] < 0) || (q_max[i] < 0 && q_min[i] > 0))
+                psi_tmp[i] = -psi_tmp[i];
+        for (unsigned int i = 3; i < 10; i++)
+            psi_tmp_1[i] = psi_tmp[i - 3];
+        psi += Ks_BARRIER_JOINT_LIMIT * psi_tmp_1;
+    }
+
+    void WholeBody_manipulability_psi(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        double psi_arr[7];
+        Matrix<double> psi_tmp(7, 1);
+        Matrix<double> psi_tmp_1(10, 1);
+        kinova_psi_manipulability(q[0], q[1], q[2], q[3], q[4], q[5], psi_arr);
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 3; i < 10; i++)
+            psi_tmp_1[i] = psi_tmp[i - 3];
+        psi += Ks_MANIPULABILITY * psi_tmp;
+    }
+
+    void WholeBody_joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi)
+    {
+        double psi_arr[7];
+        Matrix<double> psi_tmp(7, 1);
+        Matrix<double> psi_tmp_1(10, 1);
+    #ifdef JML_JOINT_ALL
+        const double q_max[7] = {q1_MAX, q2_MAX, q3_MAX, q4_MAX, q5_MAX, q6_MAX, q7_MAX};
+        const double q_min[7] = {q1_MIN, q2_MIN, q3_MIN, q4_MIN, q5_MIN, q6_MIN, q7_MIN};
+        kinova_psi_jointAngleLimits_all(q[0], q[1], q[2], q[3], q[4], q[5], q[6], q_max[0], q_max[1], q_max[2], q_max[3], q_max[4], q_max[5], q_max[6], q_min[0], q_min[1], q_min[2], q_min[3], q_min[4], q_min[5], q_min[6], psi_arr);
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0, k = 0; i < 7; i++, k++)
+    #elif defined(JML_JOINT_246)
+        const double q_max[3] = {q2_MAX, q4_MAX, q6_MAX};
+        const double q_min[3] = {q2_MIN, q4_MIN, q6_MIN};
+        kinova_psi_jointAngleLimits_246(q[1], q[3], q[5], q_max[0], q_max[1], q_max[2], q_min[0], q_min[1], q_min[2], psi_arr);
+        psi_tmp.update_from_matlab(psi_arr);
+        for (unsigned int i = 0, k = 1; i < 3; i++, k += 2)
+    #endif
+            if ((q_max[i] > 0 && q_min[i] < 0) || (q_max[i] < 0 && q_min[i] > 0))
+                psi_tmp[k] = -psi_tmp[k];
+        for (unsigned int i = 3; i < 10; i++)
+            psi_tmp_1[i] = psi_tmp[i - 3];
+        psi += Ks_JOINT_LIMIT * psi_tmp;
     }
 
     // Mobile platform controller test
