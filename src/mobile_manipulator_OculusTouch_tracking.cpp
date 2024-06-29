@@ -45,11 +45,11 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
     
     q_pd0[0] = oculusState.Xd[0];
     q_pd0[1] = oculusState.Xd[1];
-    q_pd0[2] = oculusState.Xd[6];
+    q_pd0[2] = oculusState.Xd[5];
 
     q_pd[0] = oculusState.Xd[0] - q_pd0[0];
     q_pd[1] = oculusState.Xd[1] - q_pd0[1];
-    q_pd[2] = oculusState.Xd[5] - q_pd0[5];
+    q_pd[2] = oculusState.Xd[5] - q_pd0[2];
 
     Matrix<double> prev_q_pd(3, 1);
 
@@ -68,7 +68,7 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
                 {
                     q_pd0[0] = oculusState.Xd[0];
                     q_pd0[1] = oculusState.Xd[1];
-                    q_pd0[2] = oculusState.Xd[6];
+                    q_pd0[2] = oculusState.Xd[5];
                 }
 
                 lee::reference_cmd_vel(dq_pd, q_p, round_p, cmd_vel_r);
@@ -93,7 +93,7 @@ bool platform_control(PlatformState &platformState, ros::Publisher &platform_cmd
 
                 q_pd[0] = oculusState.Xd[0] - q_pd0[0];
                 q_pd[1] = oculusState.Xd[1] - q_pd0[1];
-                q_pd[2] = oculusState.Xd[5] - q_pd0[5];
+                q_pd[2] = oculusState.Xd[5] - q_pd0[2];
 
                 error_p = q_pd - q_p;
 
