@@ -192,7 +192,6 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         Matrix<double> prev_q_p(3, 1); // -inf~inf
         Matrix<double> prev_Xd(6, 1);
         Matrix<double> prev_dXd(6, 1);
-        Matrix<double> prev_Jp_inv(2, 3);
 
         // Desired trajectory
         Matrix<double> Xd0 = oculusState.Xd;
@@ -249,7 +248,6 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     lee::WholeBody_manipulator_config_psi(position_curr, psi);
                     lee::WholeBody_null_space_subtasks(Jw, Jw_inv, psi, dq_w, subtasks);
                     // RBFNN
-                    for (unsigned i = 0; i < 7; i++)
                     lee::wholeBody_get_phi(q_p, q, dq_p, dq, dXd, ddXd, phi);
                     lee::wholeBody_get_dW_hat(phi, derror, Gamma_lee, dGamma_lee, W_hat, dW_hat);
                     for (unsigned i = 0; i < DOF; i ++)
