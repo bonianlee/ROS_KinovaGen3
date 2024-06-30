@@ -154,7 +154,6 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                 q_w[i] = q[i - 3];
                 dq_w[i] = dq[i - 3];
             }
-  
         }
         // Forward kinematic
         double X_arr[6];
@@ -340,6 +339,21 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     position_curr_p = platformState.q_p[2];
                     q2inf_p(position_curr_p, prev_q_p, round_p, q_p);
                     lee::mobile_platform_kinematic(position_curr_p, twist, dq_p);
+
+                    // Update the whole-body data
+                    for (unsigned int i = 0; i < 10; i++)
+                    {
+                        if (i < 3)
+                        {
+                            q_w[i] = q_p[i];
+                            dq_w[i] = dq_p[i];
+                        }
+                        else
+                        {
+                            q_w[i] = q[i - 3];
+                            dq_w[i] = dq[i - 3];
+                        }
+                    }
 
                     Xd = X0 + oculusState.Xd - Xd0;
                     // Fixed the orientation to initialize pose, please uncomment the following code
