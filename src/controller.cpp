@@ -240,11 +240,11 @@ namespace lee
         psi += Ks_MANIPULATOR_CONFIG * psi_tmp;
     }
 
-    void null_space_subtasks(Matrix<double> &J, Matrix<double> &J_inv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
+    void null_space_subtasks(Matrix<double> &J, Matrix<double> &Jinv, Matrix<double> &psi, const Matrix<double> &dq, Matrix<double> &subtasks)
     {
         Matrix<double> eye(7, 7, MatrixType::Diagonal, {1, 1, 1, 1, 1, 1, 1});
         Matrix<double> Ksd(7, 7, MatrixType::Diagonal, Ksd_INITLIST);
-        subtasks = (eye - J_inv * J) * (psi - Ksd * dq);
+        subtasks = (eye - Jinv * J) * (psi - Ksd * dq);
         psi.zeros();
     }
 
@@ -291,7 +291,7 @@ namespace lee
     void wholeBody_get_phi(const Matrix<double> &q_p, const Matrix<double> &q, const Matrix<double> &dq_p, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi)
     {
         Matrix<double> X(16 + (2 * DOF) + 1, 1);
-        for (unsigned i = 0; i < (18 + 2 * DOF); i++)
+        for (unsigned i = 0; i < (17 + 2 * DOF); i++)
         {
             if (i == 0)
                 X[i] = q_p[2];
@@ -460,7 +460,7 @@ namespace lee
         psi_tmp.update_from_matlab(psi_arr);
         for (unsigned int i = 3; i < 10; i++)
             psi_tmp_1[i] = psi_tmp[i - 3];
-        psi += Ks_MANIPULABILITY * psi_tmp;
+        psi += Ks_MANIPULABILITY * psi_tmp_1;
     }
 
     void WholeBody_joint_angle_limit_psi(const Matrix<double> &q, Matrix<double> &psi)
@@ -485,7 +485,7 @@ namespace lee
                 psi_tmp[k] = -psi_tmp[k];
         for (unsigned int i = 3; i < 10; i++)
             psi_tmp_1[i] = psi_tmp[i - 3];
-        psi += Ks_JOINT_LIMIT * psi_tmp;
+        psi += Ks_JOINT_LIMIT * psi_tmp_1;
     }
 
     // Mobile platform controller test

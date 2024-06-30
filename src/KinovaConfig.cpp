@@ -234,11 +234,11 @@ void gravity_compensation(const Matrix<double> &q, const double init_tau[7], Mat
     tau[6] += G[6] + init_tau[6];
 }
 
-void wholeBody_gravity_compensation(const Matrix<double> &q_w, const double init_tau[7], Matrix<double> &tau_w)
+void wholeBody_gravity_compensation(const Matrix<double> &position_curr, const double init_tau[7], Matrix<double> &tau_w)
 {
     double G_arr[7];
     Matrix<double> G(7, 1);
-    kinova_G_gripper(GRAVITY, q_w[3], q_w[4], q_w[5], q_w[6], q_w[7], q_w[8], q_w[9], G_arr);
+    kinova_G_gripper(GRAVITY, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], G_arr);
     G.update_from_matlab(G_arr);
     tau_w[3] += G[0] + init_tau[0] * 0.05;
     tau_w[4] += G[1] + init_tau[1] * 0.08;

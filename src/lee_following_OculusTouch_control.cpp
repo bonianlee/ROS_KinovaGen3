@@ -267,7 +267,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     // Command torque for the KinovaGen3
                     for (int i = 3; i < 10; i++)
                     {
-                        base_command.mutable_actuators(i)->set_torque_joint(controller_tau[i]);
+                        base_command.mutable_actuators(i - 3)->set_torque_joint(controller_tau[i]);
                         kinovaInfo.torque[i - 3] = controller_tau[i];
                     }
                     // Command velocity for the mobile platform

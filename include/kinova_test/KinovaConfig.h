@@ -73,11 +73,11 @@ void gravity_compensation(const Matrix<double> &q, const double init_tau[7], Mat
 /*
  * 全身控制之機械手臂重力補償。
  *
- * @param q_w: 10*1 關節角度
+ * @param curr_pos: 7*1 當前關節角度 (-pi~pi)
  * @param init_tau: 7*1 初始扭矩(機械手臂)
  * @param tau_w: 10*1 的輸出扭矩向量
  */
-void wholeBody_gravity_compensation(const Matrix<double> &q_w, const double init_tau[7], Matrix<double> &tau_w);
+void wholeBody_gravity_compensation(const Matrix<double> &curr_pos, const double init_tau[7], Matrix<double> &tau_w);
 
 /*
  * 將關節角度轉到 -inf 到 inf。
