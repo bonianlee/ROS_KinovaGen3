@@ -135,6 +135,12 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                 position_curr[i] = -(2 * M_PI - position_curr[i]);
         }
         q = position_curr;
+
+        // Amend the orientation of 3rd joint of manipulator
+        int amend = 1;
+        if (q[2] < 0)
+            amend = -1;
+        
         // read paltform's translation data
         for (unsigned int i = 0; i < 2; i++)
             q_p[i] = platformState.q_p[i];
@@ -158,7 +164,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         // Forward kinematic
         double X_arr[6];
         Matrix<double> X(DOF, 1), dX(DOF, 1);
-        exp_WholeBody_FK(q_p[0], q_p[1], position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
+        WholeBody_FK(q_p[0], q_p[1], position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
         X.update_from_matlab(X_arr);
         Matrix<double> X0 = X;
 
@@ -166,7 +172,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         double Jw_arr[60]; //Jw_inv_arr[60]
         Matrix<double> Jw_6_10(6, 10);
         Matrix<double> Jw(DOF, 10), Jw_inv(10, DOF); //dJw_inv(10, DOF)
-        exp_WholeBody_J(position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
+        WholeBody_J(position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], Jw_arr); // Odom q_p[2] 的範圍
         Jw_6_10.update_from_matlab(Jw_arr);
 #if DOF == 3
         for (int i = 0; i < 3; i++)
@@ -201,6 +207,15 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
         Matrix<double> derror = dX - dXd;
         Matrix<double> error_p = q_pd - q_p;
         Matrix<double> error_p_tf(3, 1);
+
+        // Filter
+        double filter_bandwidth = 50.0;
+        // dq_pd
+        Matrix<double> dq_pd_filter(3, 1), dq_pd_filter_last(3, 1);
+        // dq_p
+        Matrix<double> dq_p_filter(3, 1), dq_p_filter_last(3, 1);
+        // q_p
+        Matrix<double> q_p_filter(3, 1), q_p_filter_last(3, 1);
 
         // Controller-related
         Matrix<double> psi(10, 1), subtasks(10, 1);
@@ -244,10 +259,10 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     lee::WholeBody_manipulability_psi(position_curr, psi);
                     lee::WholeBody_joint_limit_subtask(position_curr, psi);
                     lee::WholeBody_joint_vel_limit_subtask(position_curr, psi);
-                    lee::WholeBody_manipulator_config_psi(position_curr, psi);
+                    lee::WholeBody_manipulator_config_psi(position_curr, amend, psi);
                     lee::WholeBody_null_space_subtasks(Jw, Jw_inv, psi, dq_w, subtasks);
                     // RBFNN
-                    lee::wholeBody_get_phi(q_p, q, dq_p, dq, dXd, ddXd, phi);
+                    lee::wholeBody_get_phi(q_p, q, dq_p_filter, dq, dXd, ddXd, phi);
                     lee::wholeBody_get_dW_hat(phi, derror, Gamma_lee, dGamma_lee, W_hat, dW_hat);
                     for (unsigned i = 0; i < DOF; i ++)
                         sigma[i] = (W_hat.at(i).transpose() * phi)[0];
@@ -259,9 +274,9 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     // Saturation for the torque
                     wholeBody_torque_saturation(controller_tau);
                     // Admittance interface
-                    lee::Admittance_interface(dq_pd, ddq_pd, controller_tau);
+                    lee::Admittance_interface(dq_pd_filter, ddq_pd, controller_tau);
                     // Platform controller
-                    lee::reference_cmd_vel(dq_pd, q_p, round_p, cmd_vel_r);
+                    lee::reference_cmd_vel(dq_pd_filter, q_p, round_p, cmd_vel_r);
                     lee::mobile_platform_error_tf(error_p, position_curr_p, error_p_tf);
                     lee::mobile_platform_control_rule(cmd_vel_r, error_p_tf, cmd_vel);
                     // Command torque for the KinovaGen3
@@ -290,7 +305,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     q2inf(position_curr, prev_q, round, q);
 
                     // Forward kinematic
-                    exp_WholeBody_FK(q_p[0], q_p[1], position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
+                    WholeBody_FK(q_p[0], q_p[1], position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], X_arr);
                     X.update_from_matlab(X_arr);
                     kinovaInfo.kinova_X = {X[0], X[1], X[2]};
                     kinovaInfo.kinova_Xd = {Xd[0], Xd[1], Xd[2]};
@@ -301,7 +316,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     kinovaInfo.gripperPos = base_feedback.interconnect().gripper_feedback().motor(0).position();
 
                     // Jacobian matrix
-                    exp_WholeBody_J(position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], position_curr[6], Jw_arr); // Odom q_p[2] 的範圍
+                    WholeBody_J(position_curr_p, position_curr[0], position_curr[1], position_curr[2], position_curr[3], position_curr[4], position_curr[5], Jw_arr); // Odom q_p[2] 的範圍
                     Jw_6_10.update_from_matlab(Jw_arr);
 #if DOF == 3
                     for (int i = 0; i < 3; i++)
@@ -345,7 +360,7 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     {
                         if (i < 3)
                         {
-                            q_w[i] = q_p[i];
+                            q_w[i] = q_p_filter[i];
                             dq_w[i] = dq_p[i];
                         }
                         else
@@ -359,6 +374,18 @@ bool torque_control(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclic
                     // Fixed the orientation to initialize pose, please uncomment the following code
                     // for (int i = 3; i < 6; i++)
                     //     Xd[i] = X0[i];
+
+                    // Filter
+                    for (unsigned int i = 0; i < 3; i++)
+                    {
+                        dq_pd_filter[i] = dq_pd_filter_last[i] + dt * (filter_bandwidth * (dq_pd[i] - dq_pd_filter_last[i]));
+                        dq_p_filter[i] = dq_p_filter_last[i] + dt * (filter_bandwidth * (dq_p[i] - dq_p_filter_last[i]));
+                        q_p_filter[i] = q_p_filter_last[i] + dt * (filter_bandwidth * (q_p[i] - q_p_filter_last[i]));
+                    }
+                    dq_pd_filter_last = dq_pd_filter;
+                    dq_p_filter_last = dq_p_filter;
+                    q_p_filter_last = q_p_filter;
+                    
 
                     error = X - Xd;
                     derror = dX - dXd;

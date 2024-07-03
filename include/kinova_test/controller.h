@@ -80,7 +80,7 @@
     }
 #define qH_INITLIST \
     {               \
-        0, 0.2618, 3.1416, -2.2689, 0, 0.9599, 1.5708   \
+        0, 0.2618, -3.1416, -2.2689, 0, 0.9599, 1.5708   \
     }
 
 // chang's Controller Parameters
@@ -173,7 +173,7 @@ namespace lee
     void wholeBody_get_phi(const Matrix<double> &q_p, const Matrix<double> &q, const Matrix<double> &dq_p, const Matrix<double> &dq, const Matrix<double> &dxd, const Matrix<double> &ddxd, Matrix<double> &phi);
     void wholeBody_get_dW_hat(const Matrix<double> &phi, const Matrix<double> &derror, const double Gamma_lee, double dGamma_lee, std::vector<Matrix<double>> &W_hat, std::vector<Matrix<double>> &dW_hat);
     void WholeBody_null_space_subtasks(Matrix<double> &Jw, Matrix<double> &Jw_inv, Matrix<double> &psi, const Matrix<double> &dq_w, Matrix<double> &subtasks);
-    void WholeBody_manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi);
+    void WholeBody_manipulator_config_psi(const Matrix<double> &q, int amend, Matrix<double> &psi);
     void WholeBody_joint_vel_limit_subtask(const Matrix<double> &dq, Matrix<double> &psi);
     void WholeBody_joint_limit_subtask(const Matrix<double> &q, Matrix<double> &psi);
     void WholeBody_manipulability_psi(const Matrix<double> &q, Matrix<double> &psi);

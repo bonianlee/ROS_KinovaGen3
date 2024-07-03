@@ -364,11 +364,12 @@ namespace lee
         psi.zeros();
     }
 
-    void WholeBody_manipulator_config_psi(const Matrix<double> &q, Matrix<double> &psi)
+    void WholeBody_manipulator_config_psi(const Matrix<double> &q, int amend, Matrix<double> &psi)
     {
         Matrix<double> qH(7, 1, MatrixType::General, qH_INITLIST);
         Matrix<double> psi_tmp(7, 1);
         Matrix<double> psi_tmp_1(10, 1);
+        qH[2] *= amend;
         psi_tmp = qH - q;
         for (unsigned int i = 3; i < 10; i++)
             psi_tmp_1[i] = psi_tmp[i - 3];
