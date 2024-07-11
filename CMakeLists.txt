@@ -52,7 +52,7 @@ target_sources(mylibary
   ${PROJECT_SOURCE_DIR}/src/conio.c
   ${PROJECT_SOURCE_DIR}/src/HumanState.cpp
   ${PROJECT_SOURCE_DIR}/src/PlatformState.cpp
-  ${PROJECT_SOURCE_DIR}/src/lee_following_human_control.cpp
+  ${PROJECT_SOURCE_DIR}/src/HumanHandPos.cpp
 )
 
 ## 連接函式庫
@@ -65,6 +65,9 @@ link_libraries(
   ${PROJECT_SOURCE_DIR}/lib/release/libKortexApiCpp.a
   ${PROJECT_SOURCE_DIR}/lib/libexp_WholeBody_FK.a
   ${PROJECT_SOURCE_DIR}/lib/libexp_WholeBody_J.a
+  ${PROJECT_SOURCE_DIR}/lib/libWholeBody_FK.a
+  ${PROJECT_SOURCE_DIR}/lib/libWholeBody_J.a
+  ${PROJECT_SOURCE_DIR}/lib/libWholeBody_J_analytic.a
   ${catkin_LIBRARIES}
 )
 

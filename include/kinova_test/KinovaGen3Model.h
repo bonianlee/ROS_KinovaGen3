@@ -70,6 +70,17 @@ void exp_WholeBody_FK(double x_p, double y_p, double phi_p, double q1,
                       double q2, double q3, double q4, double q5, double q6,
                       double q7, double X[6]);
 
+void WholeBody_J(double qv_z, double q1, double q2, double q3, double q4,
+                 double q5, double q6, double Jw[60]);
+
+void WholeBody_FK(double qv_x, double qv_y, double qv_z, double q1, double q2,
+                  double q3, double q4, double q5, double q6, double q7,
+                  double X[6]);
+
+extern void WholeBody_J_analytic(double qv_x, double qv_z, double q1, double q2,
+                                 double q3, double q4, double q5, double q6,
+                                 double q7, double Jw[60]);
+
 // Parameters
 enum class KinovaParams
 {
